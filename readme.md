@@ -35,8 +35,12 @@ python3.6 -m pip install  -r requirements.txt
 ```
 2. Mount the file system in a temporary directory
 
-For now, it will expect a local MongoDB instance running on 127.0.0.1. A configuration file will be possible later on.
+By default the configuration file is in /etc/mongofs/mongofs.json. You can give an alternative path in the command line
+directly, as second argument.
 ```
 mkdir -p /mnt/mongofs
-python3.6 src/main.py /mnt/data
+python3.6 src/main.py /mnt/data 
+
+# With a specific configuration filepath
+python3.6 src/main.py /mnt/data /root/src/conf/mongofs.json
 ```
