@@ -15,6 +15,15 @@ class MongoFS(LoggingMixIn, Operations):
     def __init__(self):
         self.configuration = Configuration()
         self.mongo = Mongo()
+        self.files = {}
+
+    """
+        List files inside a directory
+    """
+    def readdir(self, path, fh):
+        print('List directory for "'+str(path)+'" & "'+str(fh)+'"')
+        files = self.mongo.list_files(directory=path)
+        return ['.', '..'] + files
 
 if __name__ == '__main__':
     if len(argv) < 2:

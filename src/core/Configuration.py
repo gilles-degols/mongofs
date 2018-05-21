@@ -22,3 +22,16 @@ class Configuration:
     """
     def mongo_hosts(self):
         return self.conf['mongo']['hosts']
+
+    """
+        Return the database for the current filesystem instance
+    """
+    def mongo_database(self):
+        return self.conf['mongo']['database']
+
+    """
+        Return the collection prefix for the current filesystem instance.
+        Already contains the optional separator (like "_")
+    """
+    def mongo_prefix(self):
+        return self.conf['mongo']['prefix']
