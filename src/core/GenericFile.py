@@ -72,7 +72,7 @@ class GenericFile:
 
         if file_type == GenericFile.FILE_TYPE:
             struct['metadata']['st_nlink'] = 1
-            struct['medatata']['st_mode'] = (S_IFREG | mode)
+            struct['metadata']['st_mode'] = (S_IFREG | mode)
         elif file_type == GenericFile.DIRECTORY_TYPE:
             # If this is a directory, the default value st_nlink must be 2, to be sure to have a non-zero value if there is no
             # referenced file in the directory
