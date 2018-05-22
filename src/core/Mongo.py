@@ -21,6 +21,8 @@ class Mongo:
         self.gridfs_collection = Mongo.configuration.mongo_prefix() + 'files'
         self.gridfs = gridfs.GridFS(self.database, self.gridfs_collection)
 
+        self.gridfs_files_collection = Mongo.configuration.mongo_prefix() + 'files.files'
+
     """
         Establish a connection to mongodb
     """
@@ -29,13 +31,45 @@ class Mongo:
         Mongo.instance = MongoClient(mongo_path)
 
     """
-        List files in a given directory. We only need to return a list of filenames (not the absolute path).
-        A filename must not start with "/". 
+        List absolute filepathes in a given directory. 
     """
     def list_files(self, directory):
         filenames = []
-        for elem in self.gridfs.find({'directory':directory}, no_cursor_timeout=True):
-            # TODO PERF: Store a lookup filename -> object for the next operations (in less than 1s) asking
-            # for the file size, ....
+        for elem in self.gridfs.find({'directory':directory,'file_type':File}, no_cursor_timeout=True):
             filenames.append(elem.filename)
         return filenames
+
+    """
+        Create a generic file in gridfs. 
+    """
+    def create_generic_file(self, file):
+        f = self.gridfs.new_file(**file.json)
+        f.close()
+
+    """
+        Indicates if the generic file exists or not. 
+    """
+    def generic_file_exists(self, filename):
+        return self.get_generic_file(filename=filename)
+
+    """
+        Retrieve any file / directory / link document from Mongo. Returns None if none are found.
+    """
+    def get_generic_file(self, filename):
+        return self.gridfs.find_one({'filename': filename})
+
+    """
+        Increment/reduce the number of links for a directory 
+    """
+    def add_nlink_directory(self, directory, value):
+        # You cannot update directly the object from gridfs, you need to do a MongoDB query instead
+        coll = self.database[self.gridfs_files_collection]
+        coll.find_one_and_update({'filename':directory},
+                                {'$inc':{'metadata.st_nlink':value}})
+
+    """
+        Clean the database, only for development purposes
+    """
+    def clean_database(self):
+        self.database[self.gridfs_collection+'.chunks'].drop()
+        self.database[self.gridfs_collection+'.files'].drop()

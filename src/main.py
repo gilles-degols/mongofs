@@ -5,6 +5,7 @@ from sys import argv, exit
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from core.Configuration import Configuration
+from core.GenericFile import GenericFile
 from core.Mongo import Mongo
 
 """
@@ -16,6 +17,30 @@ class MongoFS(LoggingMixIn, Operations):
         self.configuration = Configuration()
         self.mongo = Mongo()
         self.files = {}
+
+        # Additional setup
+        GenericFile.mongo = self.mongo
+
+        # START DEBUG ONLY - Drop the old information from MongoDB
+        self.mongo.clean_database()
+        # END DEBUG ONLY
+
+        # We need to be sure to have the top folder created in MongoDB
+        self.mkdir(path='/', mode=0o770000)
+
+    """
+        Create a file and returns a "file descriptor", which is in fact, simply the _id.
+    """
+    def create(self, path, mode):
+        f = GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.FILE_TYPE)
+        return f.file_descriptor
+
+    """
+        Create a directory, no need to return anything
+    """
+    def mkdir(self, path, mode):
+        print('Try to create '+path+' & '+str(mode))
+        GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.DIRECTORY_TYPE)
 
     """
         List files inside a directory

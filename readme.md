@@ -19,6 +19,16 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
    - Super-fast listing of files, and computation of total directory size.
    - No "advanced" problems that you could find with inodes, ... once you start to have millions of files.
 
+Features development:
+- [ ] Creation of a file
+- [ ] Deletion of a file
+- [ ] List files
+- [ ] Manage ownership owner & group
+- [ ] Performance improvement (caching, ...)
+- [ ] Scalability test
+- [ ] Rollback
+- [ ] File Lock
+
 ### Developer's guide
 
 1. First installation
@@ -42,5 +52,5 @@ mkdir -p /mnt/mongofs
 python3.6 src/main.py /mnt/data 
 
 # With a specific configuration filepath
-python3.6 src/main.py /mnt/data /root/src/conf/mongofs.json
+python3.6 src/main.py /mnt/data /root/mongofs/conf/mongofs.json
 ```
