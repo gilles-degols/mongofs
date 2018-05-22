@@ -49,7 +49,7 @@ python3.6 -m pip install  -r requirements.txt
 By default the configuration file is in /etc/mongofs/mongofs.json. You can give an alternative path in the command line
 directly, as second argument.
 ```
-mkdir -p /mnt/mongofs
+mkdir -p /mnt/data
 python3.6 src/main.py /mnt/data 
 
 # With a specific configuration filepath
