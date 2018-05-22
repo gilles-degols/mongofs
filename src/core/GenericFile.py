@@ -116,6 +116,8 @@ class GenericFile:
         # We try to look for the directory directly above it (only one layer above), as we need to increase the "st_nlink" value.
         directory = GenericFile.get_directory(filename=filename)
         if filename != '/' and not GenericFile.mongo.generic_file_exists(filename=directory):
+            # There is no need to verify if this level above the current file is a directory or not, it will be automatically
+            # checked by FUSE with readdir()
             print('Missing intermediate directory "'+directory+'" for file "'+filename+'".')
             return True
 

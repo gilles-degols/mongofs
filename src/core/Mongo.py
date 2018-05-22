@@ -2,6 +2,7 @@
 from pymongo import MongoClient
 import gridfs
 from core.Configuration import Configuration
+from core.GenericFile import GenericFile
 
 class Mongo:
     instance = None
@@ -33,9 +34,11 @@ class Mongo:
     """
         List absolute filepathes in a given directory. 
     """
-    def list_files(self, directory):
+    def list_filenames(self, directory):
         filenames = []
-        for elem in self.gridfs.find({'directory':directory,'file_type':File}, no_cursor_timeout=True):
+        print('List files in "'+directory+'"')
+        for elem in self.gridfs.find({'directory':directory}, no_cursor_timeout=True):
+            print('Found filename...')
             filenames.append(elem.filename)
         return filenames
 
@@ -50,7 +53,7 @@ class Mongo:
         Indicates if the generic file exists or not. 
     """
     def generic_file_exists(self, filename):
-        return self.get_generic_file(filename=filename)
+        return self.get_generic_file(filename=filename) is not None
 
     """
         Retrieve any file / directory / link document from Mongo. Returns None if none are found.

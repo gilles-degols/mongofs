@@ -27,7 +27,7 @@ class MongoFS(LoggingMixIn, Operations):
         # END DEBUG ONLY
 
         # We need to be sure to have the top folder created in MongoDB
-        self.mkdir(path='/', mode=0o770000)
+        self.mkdir(path='/', mode=0o755)
 
     """
         Create a file and returns a "file descriptor", which is in fact, simply the _id.
@@ -48,8 +48,11 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def readdir(self, path, fh):
         print('List directory for "'+str(path)+'" & "'+str(fh)+'"')
-        files = self.mongo.list_files(directory=path)
-        return ['.', '..'] + files
+        filenames = self.mongo.list_filenames(directory=path)
+
+        # We need to only keep final filename
+        filenames = [file.split('/')[-1] for file in filenames]
+        return ['.', '..'] + filenames
 
     """
         Return general information for a given path
@@ -60,6 +63,9 @@ class MongoFS(LoggingMixIn, Operations):
             raise FuseOSError(ENOENT)
 
         return f.metadata
+
+    def removexattr(self, path, name):
+        pass
 
 if __name__ == '__main__':
     if len(argv) < 2:

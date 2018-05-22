@@ -28,6 +28,7 @@ Features development:
 - [ ] Scalability test
 - [ ] Rollback
 - [ ] File Lock
+- [ ] Unit testing
 
 ### Developer's guide
 
