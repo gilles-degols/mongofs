@@ -2,6 +2,7 @@
 import logging
 
 from sys import argv, exit
+from errno import ENOENT
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from core.Configuration import Configuration
@@ -49,6 +50,16 @@ class MongoFS(LoggingMixIn, Operations):
         print('List directory for "'+str(path)+'" & "'+str(fh)+'"')
         files = self.mongo.list_files(directory=path)
         return ['.', '..'] + files
+
+    """
+        Return general information for a given path
+    """
+    def getattr(self, path, fh=None):
+        f = self.mongo.get_generic_file(filename=path)
+        if f is None:
+            raise FuseOSError(ENOENT)
+
+        return f.metadata
 
 if __name__ == '__main__':
     if len(argv) < 2:
