@@ -10,7 +10,6 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
 1. Allows infinite scaling, up to Petabytes of data.
 2. Avoid limitations of basic file systems by allowing the following: 
    - You can put millions of files in the same directory
-   - You can create files of hundreds of TBs (being stuck à 4TB with some NFS storage is not nice)
    - Infinite hierarchy
    - Automatic redundancy 
    - Automatic compression

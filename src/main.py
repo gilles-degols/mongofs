@@ -7,6 +7,7 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
+from core.File import File
 from core.Mongo import Mongo
 
 """
@@ -47,12 +48,20 @@ class MongoFS(LoggingMixIn, Operations):
         List files inside a directory
     """
     def readdir(self, path, fh):
-        print('List directory for "'+str(path)+'" & "'+str(fh)+'"')
         filenames = self.mongo.list_filenames(directory=path)
 
         # We need to only keep final filename
         filenames = [file.split('/')[-1] for file in filenames]
         return ['.', '..'] + filenames
+
+    """
+        Write data to a file, from a specific offset. Returns the written data size
+    """
+    def write(self, path, data, offset, fh):
+        raw_file = self.mongo.get_generic_file(filename=path)
+        f = File(obj=raw_file)
+        f.add_data(data=data, offset=offset)
+        return len(data)
 
     """
         Return general information for a given path

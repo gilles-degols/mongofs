@@ -35,12 +35,27 @@ class GenericFile:
     # Link to the mongo instance, created at startup
     mongo = None
 
-    def __init__(self, json):
-        if not self.is_valid(json=json):
+    """
+        We can create a GenericFile instance from a raw json, or from a gridfs object.
+    """
+    def __init__(self, json=None, obj=None):
+        if obj is not None:
+            json = {
+                'chunkSize': obj.chunkSize,
+                'length': obj.length,
+                '_id': obj._id
+            }
+        elif not self.is_valid(json=json): # We only validate the json if it was manually created
             raise ValueError("Invalid json received.")
 
         self.json = json
         self.file_descriptor = 0
+
+        if obj is not None:
+            print(self.json)
+            self.chunkSize = self.json['chunkSize']
+            self.length = self.json['length']
+            self._id = self.json['_id']
 
     """
         Return an instance of a file / directory when we want to create a new one
@@ -150,4 +165,3 @@ class GenericFile:
     """
     def to_fuse(self):
         return self.json['metadata']
-
