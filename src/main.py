@@ -64,6 +64,14 @@ class MongoFS(LoggingMixIn, Operations):
         return len(data)
 
     """
+        Truncate a file to a specific length
+    """
+    def truncate(self, path, length, fh=None):
+        raw_file = self.mongo.get_generic_file(filename=path)
+        f = File(obj=raw_file)
+        f.truncate(length=length)
+
+    """
         Return general information for a given path
     """
     def getattr(self, path, fh=None):

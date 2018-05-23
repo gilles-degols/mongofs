@@ -129,6 +129,30 @@ class Mongo:
         return True
 
     """
+        Truncate a part of a file 
+         file: Instance of a "File" type object.
+         length: Offset from which we need to truncate the file 
+    """
+    def truncate(self, file, length):
+        coll_meta = self.database[self.gridfs_files_collection]
+        coll = self.database[self.gridfs_chunks_collection]
+
+        # We drop every unnecessary chunk
+        chunk_size = file.chunkSize
+        maximum_chunks = int(ceil(length / chunk_size))
+        coll.delete_many({'files_id':file._id,'n':{'$gte':maximum_chunks}})
+
+        # We update the last chunk
+        if length % chunk_size != 0:
+            last_chunk = coll.find_one({'files_id':file._id,'n':maximum_chunks-1})
+            last_chunk = last_chunk['data'][0:length % chunk_size]
+            coll.find_one_and_update({'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
+
+        # We update the total length and that's it
+        coll_meta.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
+        return True
+
+    """
         Clean the database, only for development purposes
     """
     def clean_database(self):

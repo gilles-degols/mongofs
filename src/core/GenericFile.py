@@ -52,7 +52,6 @@ class GenericFile:
         self.file_descriptor = 0
 
         if obj is not None:
-            print(self.json)
             self.chunkSize = self.json['chunkSize']
             self.length = self.json['length']
             self._id = self.json['_id']
