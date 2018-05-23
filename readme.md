@@ -19,9 +19,13 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
    - No "advanced" problems that you could find with inodes, ... once you start to have millions of files.
 
 Features development:
-- [ ] Creation of a file
-- [ ] Deletion of a file
-- [ ] List files
+- [x] Creation of a file & directory
+- [x] Writing to a file
+- [ ] Reading a file
+- [x] Deletion of a file & directory
+- [x] List files in a directory
+- [ ] Manage symbolic links
+- [ ] Manage special attributes on files
 - [ ] Manage ownership owner & group
 - [ ] Performance improvement (caching, ...)
 - [ ] Scalability test
