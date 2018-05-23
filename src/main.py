@@ -38,11 +38,26 @@ class MongoFS(LoggingMixIn, Operations):
         return f.file_descriptor
 
     """
+        Delete a file
+    """
+    def unlink(self, path):
+        raw_file = self.mongo.get_generic_file(filename=path)
+        gf = GenericFile(obj=raw_file)
+        self.mongo.remove_generic_file(generic_file=gf)
+
+    """
         Create a directory, no need to return anything
     """
     def mkdir(self, path, mode):
-        print('Try to create '+path+' & '+str(mode))
         GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.DIRECTORY_TYPE)
+
+    """
+        Delete a directory
+    """
+    def rmdir(self, path):
+        raw_file = self.mongo.get_generic_file(filename=path)
+        gf = GenericFile(obj=raw_file)
+        self.mongo.remove_generic_file(generic_file=gf)
 
     """
         List files inside a directory

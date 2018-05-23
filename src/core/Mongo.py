@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from pymongo import MongoClient
 import gridfs
+import errno
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
 from math import floor, ceil
@@ -38,9 +41,7 @@ class Mongo:
     """
     def list_filenames(self, directory):
         filenames = []
-        print('List files in "'+directory+'"')
         for elem in self.gridfs.find({'directory':directory}, no_cursor_timeout=True):
-            print('Found filename...')
             filenames.append(elem.filename)
         return filenames
 
@@ -50,6 +51,24 @@ class Mongo:
     def create_generic_file(self, file):
         f = self.gridfs.new_file(**file.json)
         f.close()
+
+    """
+        Remove a generic file. 
+    """
+    def remove_generic_file(self, generic_file):
+        # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
+        # be sure the directory is empty.
+        if generic_file.is_dir():
+            coll = self.database[self.gridfs_files_collection]
+            if coll.find({'directory':generic_file.filename}).count() != 0:
+                raise FuseOSError(errno.ENOTEMPTY)
+
+        # First we delete the file (metadata + chunks)
+        self.gridfs.delete(generic_file._id)
+
+        # Then we decrease the number of link in the directory above it
+        directory = GenericFile.get_directory(filename=generic_file.filename)
+        self.add_nlink_directory(directory=directory, value=-1)
 
     """
         Indicates if the generic file exists or not. 

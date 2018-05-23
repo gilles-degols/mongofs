@@ -22,6 +22,7 @@ import time
         ('st_ctimespec', c_timespec)]
     Read https://github.com/fusepy/fusepy/blob/master/fuse.py for a list of all parameters
     Another interesting reading: https://www.gnu.org/software/libc/manual/html_node/Attribute-Meanings.html
+    Available errors: https://docs.python.org/3/library/errno.html
 """
 class GenericFile:
     # List of fields authorized for fusepy
@@ -41,9 +42,11 @@ class GenericFile:
     def __init__(self, json=None, obj=None):
         if obj is not None:
             json = {
+                '_id': obj._id,
+                'file_type': obj.file_type,
+                'filename': obj.filename,
                 'chunkSize': obj.chunkSize,
-                'length': obj.length,
-                '_id': obj._id
+                'length': obj.length
             }
         elif not self.is_valid(json=json): # We only validate the json if it was manually created
             raise ValueError("Invalid json received.")
@@ -51,10 +54,30 @@ class GenericFile:
         self.json = json
         self.file_descriptor = 0
 
+        self.filename = self.json['filename']
+        self.file_type = self.json['file_type']
         if obj is not None:
             self.chunkSize = self.json['chunkSize']
             self.length = self.json['length']
             self._id = self.json['_id']
+
+    """
+        Indicates if the current GenericFile is in fact a directory
+    """
+    def is_dir(self):
+        return self.file_type == GenericFile.DIRECTORY_TYPE
+
+    """
+        Indicates if the current GenericFile is in fact a file
+    """
+    def is_file(self):
+        return self.file_type == GenericFile.FILE_TYPE
+
+    """
+        Indicates if the current GenericFile is in fact a link
+    """
+    def is_link(self):
+        return self.file_type == GenericFile.LINK_TYPE
 
     """
         Return an instance of a file / directory when we want to create a new one
