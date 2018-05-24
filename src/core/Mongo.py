@@ -92,6 +92,26 @@ class Mongo:
                                 {'$inc':{'metadata.st_nlink':value}})
 
     """
+        Read data from a file 
+         file: Instance of a "File" type object.
+         offset: Offset from which we want to read the file
+         length: Number of bytes we need to send back
+        Return bytes array
+    """
+    def read_data(self, file, offset, size):
+        coll = self.database[self.gridfs_chunks_collection]
+
+        # We get the chunks we are interested in
+        chunk_size = file.chunkSize
+        starting_chunk = int(floor(offset / chunk_size))
+        ending_chunk = int(floor((offset + size) / chunk_size))
+
+        data = b''
+        for chunk in coll.find({'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
+            data += chunk['data']
+        return data
+
+    """
         Add data to a file. 
          file: Instance of a "File" type object.
          data: bytes 
@@ -131,7 +151,6 @@ class Mongo:
         if len(data) > 0:
             remaining_chunks = int(ceil(len(data) / chunk_size))
             for i in range(0, remaining_chunks):
-                total_chunks += 1
                 chunk = {
                     "files_id": file._id,
                     "data": data[0:chunk_size],
@@ -141,6 +160,9 @@ class Mongo:
 
                 # We have written a part of what we wanted, we only the keep the remaining
                 data = data[chunk_size:]
+
+                # Next entry
+                total_chunks += 1
 
         # We update the total length and that's it
         coll_meta.find_one_and_update({'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
@@ -170,6 +192,7 @@ class Mongo:
         # We update the total length and that's it
         coll_meta.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
         return True
+
 
     """
         Clean the database, only for development purposes

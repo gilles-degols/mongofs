@@ -38,6 +38,14 @@ class MongoFS(LoggingMixIn, Operations):
         return f.file_descriptor
 
     """
+        Read a part of a file
+    """
+    def read(self, path, size, offset, fh):
+        raw_file = self.mongo.get_generic_file(filename=path)
+        f = File(obj=raw_file)
+        return f.read_data(offset=offset, size=size)
+
+    """
         Delete a file
     """
     def unlink(self, path):

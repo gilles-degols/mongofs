@@ -8,6 +8,12 @@ class File(GenericFile):
         GenericFile.mongo.add_data(file=self, data=data, offset=offset)
 
     """
+        Read a chunk of data from the file
+    """
+    def read_data(self, offset, size):
+        return GenericFile.mongo.read_data(file=self, offset=offset, size=size)
+
+    """
         Truncate a file to a specific size
     """
     def truncate(self, length):

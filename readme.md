@@ -21,7 +21,7 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
 Features development:
 - [x] Creation of a file & directory
 - [x] Writing to a file
-- [ ] Reading a file
+- [x] Reading a file
 - [x] Deletion of a file & directory
 - [x] List files in a directory
 - [ ] Manage symbolic links
@@ -29,6 +29,7 @@ Features development:
 - [ ] Manage ownership owner & group
 - [ ] Performance improvement (caching, ...)
 - [ ] Scalability test
+- [ ] Handling unreachable MongoDB instance
 - [ ] Rollback
 - [ ] File Lock
 - [ ] Unit testing
