@@ -18,3 +18,9 @@ class File(GenericFile):
     """
     def truncate(self, length):
         GenericFile.mongo.truncate(file=self, length=length)
+
+    """
+        Indicates if the current GenericFile is in fact a file
+    """
+    def is_file(self):
+        return True

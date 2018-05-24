@@ -6,6 +6,9 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
+from core.File import File
+from core.Directory import Directory
+from core.SymbolicLink import SymbolicLink
 from math import floor, ceil
 
 class Mongo:
@@ -26,8 +29,23 @@ class Mongo:
         self.gridfs_collection = Mongo.configuration.mongo_prefix() + 'files'
         self.gridfs = gridfs.GridFS(self.database, self.gridfs_collection)
 
-        self.gridfs_files_collection = Mongo.configuration.mongo_prefix() + 'files.files'
-        self.gridfs_chunks_collection = Mongo.configuration.mongo_prefix() + 'files.chunks'
+        self.files_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.files']
+        self.chunks_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.chunks']
+
+    """
+        Load the appropriate object for the given json. Should never return a GenericFile, but rather a child class.
+    """
+    @staticmethod
+    def load_generic_file(json):
+        if json['generic_file_type'] == GenericFile.FILE_TYPE:
+            return File(json)
+        elif json['generic_file_type'] == GenericFile.DIRECTORY_TYPE:
+            return Directory(json)
+        elif json['generic_file_type'] == GenericFile.SYMBOLIC_LINK_TYPE:
+            return SymbolicLink(json)
+        else:
+            print('Unsupported file type!')
+            return GenericFile(json)
 
     """
         Establish a connection to mongodb
@@ -37,30 +55,20 @@ class Mongo:
         Mongo.instance = MongoClient(mongo_path)
 
     """
-        List absolute filepathes in a given directory. 
+        Create a generic file in gridfs. No need to return it.
     """
-    def list_filenames(self, directory):
-        filenames = []
-        for elem in self.gridfs.find({'directory':directory}, no_cursor_timeout=True):
-            filenames.append(elem.filename)
-        return filenames
-
-    """
-        Create a generic file in gridfs. 
-    """
-    def create_generic_file(self, file):
-        f = self.gridfs.new_file(**file.json)
+    def create_generic_file(self, generic_file):
+        f = self.gridfs.new_file(**generic_file.json)
         f.close()
 
     """
-        Remove a generic file. 
+        Remove a generic file.
     """
     def remove_generic_file(self, generic_file):
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
         # be sure the directory is empty.
         if generic_file.is_dir():
-            coll = self.database[self.gridfs_files_collection]
-            if coll.find({'directory':generic_file.filename}).count() != 0:
+            if self.files_coll.find({'directory':generic_file.filename}).count() != 0:
                 raise FuseOSError(errno.ENOTEMPTY)
 
         # First we delete the file (metadata + chunks)
@@ -71,7 +79,16 @@ class Mongo:
         self.add_nlink_directory(directory=directory, value=-1)
 
     """
-        Indicates if the generic file exists or not. 
+        List files in a given directory. 
+    """
+    def list_generic_files_in_directory(self, directory):
+        files = []
+        for elem in self.files_coll.find({'directory':directory}, no_cursor_timeout=True):
+            files.append(Mongo.load_generic_file(elem))
+        return files
+
+    """
+        Indicate if the generic file exists or not. 
     """
     def generic_file_exists(self, filename):
         return self.get_generic_file(filename=filename) is not None
@@ -80,16 +97,18 @@ class Mongo:
         Retrieve any file / directory / link document from Mongo. Returns None if none are found.
     """
     def get_generic_file(self, filename):
-        return self.gridfs.find_one({'filename': filename})
-
+        f = self.files_coll.find_one({'filename': filename})
+        if f is not None:
+            return Mongo.load_generic_file(f)
+        return None
     """
         Increment/reduce the number of links for a directory 
     """
     def add_nlink_directory(self, directory, value):
         # You cannot update directly the object from gridfs, you need to do a MongoDB query instead
-        coll = self.database[self.gridfs_files_collection]
-        coll.find_one_and_update({'filename':directory},
-                                {'$inc':{'metadata.st_nlink':value}})
+        self.files_coll.find_one_and_update({'filename':directory},
+                                                         {'$inc':{'metadata.st_nlink':value}})
+
 
     """
         Read data from a file 
@@ -99,15 +118,13 @@ class Mongo:
         Return bytes array
     """
     def read_data(self, file, offset, size):
-        coll = self.database[self.gridfs_chunks_collection]
-
         # We get the chunks we are interested in
         chunk_size = file.chunkSize
         starting_chunk = int(floor(offset / chunk_size))
         ending_chunk = int(floor((offset + size) / chunk_size))
 
         data = b''
-        for chunk in coll.find({'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
+        for chunk in self.chunks_coll.find({'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
             data += chunk['data']
         return data
 
@@ -120,8 +137,6 @@ class Mongo:
         # Normally, we should not update a gridfs document, but re-write everything. I don't see any specific reason
         # to do that, so we will try to update it anyway. But we will only rewrite the last chunks of it, or add information
         # to them, while keeping the limitation of ~255KB/chunk
-        coll_meta = self.database[self.gridfs_files_collection]
-        coll = self.database[self.gridfs_chunks_collection]
 
         # Final size after the update
         total_size = offset + len(data)
@@ -133,9 +148,9 @@ class Mongo:
         starting_byte = offset - starting_chunk * chunk_size
         if starting_byte < 0:
             print('Computation error for offset: '+str(offset))
-        for chunk in coll.find({'files_id':file._id,'n':{'$gte':starting_chunk}}):
+        for chunk in self.chunks_coll.find({'files_id':file._id,'n':{'$gte':starting_chunk}}):
             chunk['data'] = chunk['data'][0:starting_byte] + data[0:chunk_size-starting_byte]
-            coll.find_one_and_update({'_id':chunk['_id']},{'$set':{'data':chunk['data']}})
+            self.chunks_coll.find_one_and_update({'_id':chunk['_id']},{'$set':{'data':chunk['data']}})
 
             # We have written a part of what we wanted, we only need to keep the remaining
             data = data[chunk_size-starting_byte:]
@@ -156,7 +171,7 @@ class Mongo:
                     "data": data[0:chunk_size],
                     "n": total_chunks
                 }
-                coll.save(chunk)
+                self.chunks_coll.save(chunk)
 
                 # We have written a part of what we wanted, we only the keep the remaining
                 data = data[chunk_size:]
@@ -165,7 +180,7 @@ class Mongo:
                 total_chunks += 1
 
         # We update the total length and that's it
-        coll_meta.find_one_and_update({'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
+        self.files_coll.find_one_and_update({'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
 
         return True
 
@@ -175,22 +190,19 @@ class Mongo:
          length: Offset from which we need to truncate the file 
     """
     def truncate(self, file, length):
-        coll_meta = self.database[self.gridfs_files_collection]
-        coll = self.database[self.gridfs_chunks_collection]
-
         # We drop every unnecessary chunk
         chunk_size = file.chunkSize
         maximum_chunks = int(ceil(length / chunk_size))
-        coll.delete_many({'files_id':file._id,'n':{'$gte':maximum_chunks}})
+        self.chunks_coll.delete_many({'files_id':file._id,'n':{'$gte':maximum_chunks}})
 
         # We update the last chunk
         if length % chunk_size != 0:
-            last_chunk = coll.find_one({'files_id':file._id,'n':maximum_chunks-1})
+            last_chunk = self.chunks_coll.find_one({'files_id':file._id,'n':maximum_chunks-1})
             last_chunk = last_chunk['data'][0:length % chunk_size]
-            coll.find_one_and_update({'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
+            self.chunks_coll.find_one_and_update({'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
 
         # We update the total length and that's it
-        coll_meta.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
+        self.files_coll.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
         return True
 
 
@@ -198,5 +210,5 @@ class Mongo:
         Clean the database, only for development purposes
     """
     def clean_database(self):
-        self.database[self.gridfs_collection+'.chunks'].drop()
-        self.database[self.gridfs_collection+'.files'].drop()
+        self.chunks_coll.drop()
+        self.files_coll.drop()

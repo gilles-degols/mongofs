@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import logging
+import time
 
 from sys import argv, exit
 from errno import ENOENT
@@ -14,6 +15,7 @@ from core.Mongo import Mongo
 """
     Simulate a file system running on MongoDB.
     A simple example to start: https://github.com/terencehonles/fusepy/blob/master/examples/memory.py
+    List of fuse low-level methods: https://pike.lysator.liu.se/generated/manual/modref/ex/predef_3A_3A/Fuse/Operations/
 """
 class MongoFS(LoggingMixIn, Operations):
     def __init__(self):
@@ -35,8 +37,8 @@ class MongoFS(LoggingMixIn, Operations):
         Create a file and returns a "file descriptor", which is in fact, simply the _id.
     """
     def create(self, path, mode):
-        f = GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.FILE_TYPE)
-        return f.file_descriptor
+        file = GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.FILE_TYPE)
+        return file.file_descriptor
 
     """
         Create a symbolic link to a generic file (source -> target). No need to return a file descriptor.
@@ -46,33 +48,28 @@ class MongoFS(LoggingMixIn, Operations):
         we receive them (SYMLINK, TARGET) which is kinda weird.
     """
     def symlink(self, source, target):
-        print('Should create symlink '+str(source)+' -> '+str(target))
         GenericFile.new_generic_file(filename=source, mode=0o777, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=target)
 
     """
         Read a symbolic link and return the file we should be redirected to.
     """
     def readlink(self, path):
-        print('Should redirect symlink '+str(path)+' to ...')
-        raw_file = self.mongo.get_generic_file(filename=path)
-        f = SymbolicLink(obj=raw_file)
-        return f.get_target()
+        link = self.mongo.get_generic_file(filename=path)
+        return link.get_target()
 
     """
         Read a part of a file
     """
     def read(self, path, size, offset, fh):
-        raw_file = self.mongo.get_generic_file(filename=path)
-        f = File(obj=raw_file)
-        return f.read_data(offset=offset, size=size)
+        file = self.mongo.get_generic_file(filename=path)
+        return file.read_data(offset=offset, size=size)
 
     """
         Delete a file
     """
     def unlink(self, path):
-        raw_file = self.mongo.get_generic_file(filename=path)
-        gf = GenericFile(obj=raw_file)
-        self.mongo.remove_generic_file(generic_file=gf)
+        file_or_link = self.mongo.get_generic_file(filename=path)
+        self.mongo.remove_generic_file(generic_file=file_or_link)
 
     """
         Create a directory, no need to return anything
@@ -84,46 +81,43 @@ class MongoFS(LoggingMixIn, Operations):
         Delete a directory
     """
     def rmdir(self, path):
-        raw_file = self.mongo.get_generic_file(filename=path)
-        gf = GenericFile(obj=raw_file)
-        self.mongo.remove_generic_file(generic_file=gf)
+        directory = self.mongo.get_generic_file(filename=path)
+        self.mongo.remove_generic_file(generic_file=directory)
 
     """
         List files inside a directory
     """
     def readdir(self, path, fh):
-        filenames = self.mongo.list_filenames(directory=path)
+        files = self.mongo.list_generic_files_in_directory(directory=path)
 
         # We need to only keep final filename
-        filenames = [file.split('/')[-1] for file in filenames]
+        filenames = [file.filename.split('/')[-1] for file in files]
         return ['.', '..'] + filenames
 
     """
         Write data to a file, from a specific offset. Returns the written data size
     """
     def write(self, path, data, offset, fh):
-        raw_file = self.mongo.get_generic_file(filename=path)
-        f = File(obj=raw_file)
-        f.add_data(data=data, offset=offset)
+        file = self.mongo.get_generic_file(filename=path)
+        file.add_data(data=data, offset=offset)
         return len(data)
 
     """
         Truncate a file to a specific length
     """
     def truncate(self, path, length, fh=None):
-        raw_file = self.mongo.get_generic_file(filename=path)
-        f = File(obj=raw_file)
-        f.truncate(length=length)
+        file = self.mongo.get_generic_file(filename=path)
+        file.truncate(length=length)
 
     """
         Return general information for a given path
     """
     def getattr(self, path, fh=None):
-        f = self.mongo.get_generic_file(filename=path)
-        if f is None:
+        gf = self.mongo.get_generic_file(filename=path)
+        if gf is None:
             raise FuseOSError(ENOENT)
 
-        return f.metadata
+        return gf.metadata
 
     def removexattr(self, path, name):
         pass

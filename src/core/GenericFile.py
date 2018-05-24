@@ -25,9 +25,6 @@ import time
     Available errors: https://docs.python.org/3/library/errno.html
 """
 class GenericFile:
-    # List of fields authorized for fusepy
-    AUTHORIZED_METADATA_FIELDS = ['st_dev','st_ino','st_nlink','st_mode','st_uid','st_gid','st_rdev','st_size','st_blksize','st_blocks','st_atime','st_mtime','st_ctime']
-
     # Enum to easily detect the file type
     FILE_TYPE = 1
     DIRECTORY_TYPE = 2
@@ -37,49 +34,37 @@ class GenericFile:
     mongo = None
 
     """
-        We can create a GenericFile instance from a raw json, or from a gridfs object.
+        We can create a GenericFile instance from a raw json only.
     """
-    def __init__(self, json=None, obj=None):
-        if obj is not None:
-            json = {
-                '_id': obj._id,
-                'file_type': obj.file_type,
-                'filename': obj.filename,
-                'chunkSize': obj.chunkSize,
-                'length': obj.length
-            }
-            if obj.file_type == GenericFile.SYMBOLIC_LINK_TYPE:
-                json['target'] = obj.target
-        elif not self.is_valid(json=json): # We only validate the json if it was manually created
-            raise ValueError("Invalid json received.")
-
+    def __init__(self, json=None):
         self.json = json
         self.file_descriptor = 0
 
-        self.filename = self.json['filename']
-        self.file_type = self.json['file_type']
-        if obj is not None:
-            self.chunkSize = self.json['chunkSize']
-            self.length = self.json['length']
-            self._id = self.json['_id']
+        self._id = json.get('_id', None)
+        self.filename = json['filename']
+        self.chunkSize = json.get('chunkSize', None)
+        self.directory = json['directory']
+        self.generic_file_type = json['generic_file_type']
+        self.metadata = json['metadata']
+        self.length = json['length']
 
     """
         Indicates if the current GenericFile is in fact a directory
     """
     def is_dir(self):
-        return self.file_type == GenericFile.DIRECTORY_TYPE
+        return False
 
     """
         Indicates if the current GenericFile is in fact a file
     """
     def is_file(self):
-        return self.file_type == GenericFile.FILE_TYPE
+        return False
 
     """
         Indicates if the current GenericFile is in fact a link
     """
     def is_link(self):
-        return self.file_type == GenericFile.LINK_TYPE
+        return False
 
     """
         Return an instance of a file / directory when we want to create a new one
@@ -100,13 +85,14 @@ class GenericFile:
         struct = {
             'directory': directory,
             'filename': filename,
-            'file_type': file_type,
+            'generic_file_type': file_type,
             'metadata': {
                 'st_size': 0,
                 'st_ctime': dt,
                 'st_mtime': dt,
                 'st_atime': dt
-            }
+            },
+            'length': 0
         }
 
         if file_type == GenericFile.FILE_TYPE:
@@ -172,26 +158,3 @@ class GenericFile:
             return False
 
         return True
-
-    """
-        Verify the integrity of a json, is it a "file" in MongoFS?
-    """
-    @staticmethod
-    def is_valid(json):
-        if 'metadata' not in json or len(json['metadata']) == 0:
-            print('Missing metadata information while trying to load the object: ' + str(json))
-            return False
-
-        fields_are_ok = True
-        for field_name in json['metadata']:
-            if field_name not in GenericFile.AUTHORIZED_METADATA_FIELDS:
-                print('Invalid field ("'+str(field_name)+'") found in the file: '+str(json['filename']))
-                fields_are_ok = False
-
-        return fields_are_ok
-
-    """
-        Returns the current file metadata for the fuse api 
-    """
-    def to_fuse(self):
-        return self.json['metadata']

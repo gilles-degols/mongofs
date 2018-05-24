@@ -7,3 +7,9 @@ class SymbolicLink(GenericFile):
     def get_target(self):
         print(self.json)
         return self.json['target']
+
+    """
+        Indicates if the current GenericFile is in fact a link
+    """
+    def is_link(self):
+        return True
