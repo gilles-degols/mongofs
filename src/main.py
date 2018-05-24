@@ -8,6 +8,7 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
 from core.File import File
+from core.SymbolicLink import SymbolicLink
 from core.Mongo import Mongo
 
 """
@@ -36,6 +37,26 @@ class MongoFS(LoggingMixIn, Operations):
     def create(self, path, mode):
         f = GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.FILE_TYPE)
         return f.file_descriptor
+
+    """
+        Create a symbolic link to a generic file (source -> target). No need to return a file descriptor.
+         target: the file we want to display if we display "source"
+         source: the symbolic link itself
+        Important: It seems we receive the symlink parameters in a different order than "ln -s TARGET SYMLINK",
+        we receive them (SYMLINK, TARGET) which is kinda weird.
+    """
+    def symlink(self, source, target):
+        print('Should create symlink '+str(source)+' -> '+str(target))
+        GenericFile.new_generic_file(filename=source, mode=0o777, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=target)
+
+    """
+        Read a symbolic link and return the file we should be redirected to.
+    """
+    def readlink(self, path):
+        print('Should redirect symlink '+str(path)+' to ...')
+        raw_file = self.mongo.get_generic_file(filename=path)
+        f = SymbolicLink(obj=raw_file)
+        return f.get_target()
 
     """
         Read a part of a file

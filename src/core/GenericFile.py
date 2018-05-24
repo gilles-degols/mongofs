@@ -31,7 +31,7 @@ class GenericFile:
     # Enum to easily detect the file type
     FILE_TYPE = 1
     DIRECTORY_TYPE = 2
-    LINK_TYPE = 3
+    SYMBOLIC_LINK_TYPE = 3
 
     # Link to the mongo instance, created at startup
     mongo = None
@@ -48,6 +48,8 @@ class GenericFile:
                 'chunkSize': obj.chunkSize,
                 'length': obj.length
             }
+            if obj.file_type == GenericFile.SYMBOLIC_LINK_TYPE:
+                json['target'] = obj.target
         elif not self.is_valid(json=json): # We only validate the json if it was manually created
             raise ValueError("Invalid json received.")
 
@@ -83,7 +85,7 @@ class GenericFile:
         Return an instance of a file / directory when we want to create a new one
     """
     @staticmethod
-    def new_generic_file(filename, mode, file_type):
+    def new_generic_file(filename, mode, file_type, target=None):
         directory = GenericFile.get_directory(filename=filename)
 
         if not GenericFile.is_generic_filename_available(filename=filename):
@@ -115,6 +117,12 @@ class GenericFile:
             # referenced file in the directory
             struct['metadata']['st_nlink'] = 2
             struct['metadata']['st_mode'] = (S_IFDIR | mode)
+        elif file_type == GenericFile.SYMBOLIC_LINK_TYPE:
+            struct['metadata']['st_nlink'] = 1
+            struct['metadata']['st_mode'] = (S_IFLNK | mode)
+            struct['metadata']['st_size'] = len(filename)
+            struct['length'] = len(filename)
+            struct['target'] = target
         else:
             print('Unsupported file type: '+str(file_type))
             exit(1)

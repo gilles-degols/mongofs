@@ -19,12 +19,9 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
    - No "advanced" problems that you could find with inodes, ... once you start to have millions of files.
 
 Features development:
-- [x] Creation of a file & directory
-- [x] Writing to a file
-- [x] Reading a file
-- [x] Deletion of a file & directory
-- [x] List files in a directory
-- [ ] Manage symbolic links
+- [x] Directory: creation, deletion, listing of files
+- [x] File: creation, writing, reading, deletion
+- [x] Symbolic link: creation, deletion
 - [ ] Manage special attributes on files
 - [ ] Manage ownership owner & group
 - [ ] Performance improvement (caching, ...)
@@ -33,6 +30,12 @@ Features development:
 - [ ] Rollback
 - [ ] File Lock
 - [ ] Unit testing
+
+What is not possible with MongoFS:
+
+1. Any limitation related to the underlying FUSE file system, and the fusepy library on top of it, which includes:
+
+  1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
 
 ### Developer's guide
 
