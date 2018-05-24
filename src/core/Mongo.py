@@ -205,6 +205,11 @@ class Mongo:
         self.files_coll.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
         return True
 
+    """
+        Update some arbitrary fields in the general "files" object
+    """
+    def basic_save(self, generic_file, metadata):
+        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'metadata':metadata}})
 
     """
         Clean the database, only for development purposes

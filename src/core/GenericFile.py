@@ -49,6 +49,14 @@ class GenericFile:
         self.length = json['length']
 
     """
+        Save specific fields modification of the current object to MongoDB. We do not allow
+        the developer to directly update the "filename" or "chunkSize" for example. We only
+        allow the update of a few fields (metadata for example) 
+    """
+    def basic_save(self):
+        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata)
+
+    """
         Indicates if the current GenericFile is in fact a directory
     """
     def is_dir(self):

@@ -119,6 +119,25 @@ class MongoFS(LoggingMixIn, Operations):
 
         return gf.metadata
 
+    """
+        Set permissions to a given path
+    """
+    def chmod(self, path, mode):
+        gf = self.mongo.get_generic_file(filename=path)
+        gf.metadata['st_mode'] &= 0o770000
+        gf.metadata['st_mode'] |= mode
+        gf.basic_save()
+        return 0
+
+    """
+        Set owner (user & group) to a given path
+    """
+    def chown(self, path, uid, gid):
+        gf = self.mongo.get_generic_file(filename=path)
+        gf.metadata['st_uid'] = uid
+        gf.metadata['st_gid'] = gid
+        gf.basic_save()
+
     def removexattr(self, path, name):
         pass
 

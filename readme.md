@@ -22,8 +22,8 @@ Features development:
 - [x] Directory: creation, deletion, listing of files
 - [x] File: creation, writing, reading, deletion
 - [x] Symbolic link: creation, deletion
+- [x] Manage ownership owner & group
 - [ ] Manage special attributes on files
-- [ ] Manage ownership owner & group
 - [ ] Performance improvement (caching, ...)
 - [ ] Scalability test
 - [ ] Handling unreachable MongoDB instance
