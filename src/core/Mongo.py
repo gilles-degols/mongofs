@@ -208,8 +208,8 @@ class Mongo:
     """
         Update some arbitrary fields in the general "files" object
     """
-    def basic_save(self, generic_file, metadata):
-        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'metadata':metadata}})
+    def basic_save(self, generic_file, metadata, attrs):
+        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'metadata':metadata,'attrs':attrs}})
 
     """
         Clean the database, only for development purposes

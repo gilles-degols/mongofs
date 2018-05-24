@@ -46,6 +46,7 @@ class GenericFile:
         self.directory = json['directory']
         self.generic_file_type = json['generic_file_type']
         self.metadata = json['metadata']
+        self.attrs = json.get('attrs',{})
         self.length = json['length']
 
     """
@@ -54,7 +55,7 @@ class GenericFile:
         allow the update of a few fields (metadata for example) 
     """
     def basic_save(self):
-        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata)
+        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs)
 
     """
         Indicates if the current GenericFile is in fact a directory

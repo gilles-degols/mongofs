@@ -138,8 +138,55 @@ class MongoFS(LoggingMixIn, Operations):
         gf.metadata['st_gid'] = gid
         gf.basic_save()
 
+    """
+        Return a specific special attribute for a given path (for selinux for example)
+    """
+    def getxattr(self, path, name, position=0):
+        gf = self.mongo.get_generic_file(filename=path)
+        try:
+            return gf.attrs[name]
+        except KeyError:
+            return ''  # Should return ENOATTR
+
+    """
+        Return all special attributes for a given path (for selinux for example)
+    """
+    def listxattr(self, path):
+        gf = self.mongo.get_generic_file(filename=path)
+        return gf.attrs.keys()
+
+    """
+        Remove a specific special attribute for a given path
+    """
     def removexattr(self, path, name):
-        pass
+        gf = self.mongo.get_generic_file(filename=path)
+
+        if name in gf.attrs:
+            del gf.attrs[name]
+            gf.basic_save()
+        else:
+            # Should return ENOATTR
+            pass
+
+    """
+        Update the access and update time for a given path
+    """
+    def utimens(self, path, times=None):
+        now = time.time()
+        atime, mtime = times if times else (now, now)
+        gf = self.mongo.get_generic_file(filename=path)
+        gf.metadata['st_atime'] = atime
+        gf.metadata['st_mtime'] = mtime
+        gf.basic_save()
+
+    """
+        Update a specific special attribute for a given path 
+    """
+    def setxattr(self, path, name, value, options, position=0):
+        gf = self.mongo.get_generic_file(filename=path)
+        gf.attrs[name] = value
+        gf.basic_save()
+
 
 if __name__ == '__main__':
     if len(argv) < 2:

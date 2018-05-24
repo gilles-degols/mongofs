@@ -23,7 +23,10 @@ Features development:
 - [x] File: creation, writing, reading, deletion
 - [x] Symbolic link: creation, deletion
 - [x] Manage ownership owner & group
-- [ ] Manage special attributes on files
+- [x] Manage special attributes on files (for selinux)
+- [x] Set access / update time of a directory / file / symbolic link
+- [ ] Handle rename of files / directories / links
+- [ ] Handle cursor, ...
 - [ ] Performance improvement (caching, ...)
 - [ ] Scalability test
 - [ ] Handling unreachable MongoDB instance
@@ -62,3 +65,5 @@ python3.6 src/main.py /mnt/data
 # With a specific configuration filepath
 python3.6 src/main.py /mnt/data /root/mongofs/conf/mongofs.json
 ```
+Important note: As this is still a project in development, the database is automatically cleaned each time you mount the file system. This option will be moved to the configuration file soon.
+
