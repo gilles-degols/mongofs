@@ -4,7 +4,7 @@ import time
 
 from sys import argv, exit
 from errno import ENOENT
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
@@ -39,6 +39,33 @@ class MongoFS(LoggingMixIn, Operations):
     def create(self, path, mode):
         file = GenericFile.new_generic_file(filename=path, mode=mode, file_type=GenericFile.FILE_TYPE)
         return file.file_descriptor
+
+    """
+        Acquire a lock on a specific file.
+    """
+    def lock(self, path, fip, cmd, lock):
+        # Getting the file object with a lock is enough to be sure there is one on it.
+        print('Take the lock on '+str(path))
+        self.mongo.get_generic_file(filename=path, take_lock=True)
+        return lock
+
+    """
+        Release the lock on a specific file.
+    """
+    def release(self, path, fh):
+        print('Release the lock on '+str(path)+': '+str(fh))
+        gf = self.mongo.get_generic_file(filename=path)
+        print('Before unlock: '+str(gf.lock))
+        gf.unlock()
+        return 0
+
+    """
+        Release the lock on a specific directory.
+    """
+    def releasedir(self, path, fh):
+        gf = self.mongo.get_generic_file(filename=path)
+        gf.unlock()
+        return 0
 
     """
         Rename a generic file
@@ -194,6 +221,11 @@ class MongoFS(LoggingMixIn, Operations):
         gf.attrs[name] = value
         gf.basic_save()
 
+    """
+        General (static) information about the current file system.
+    """
+    def statfs(self, path):
+        return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
 if __name__ == '__main__':
     if len(argv) < 2:

@@ -35,3 +35,30 @@ class Configuration:
     """
     def mongo_prefix(self):
         return self.conf['mongo']['prefix']
+
+    """
+        Return the maximum amount of time (in seconds) we can allow a lock to be set on a file without any operation on it. If the timeout
+        happens, we release the lock (to avoid locking file eternity if there is a problem).
+        Value <= 0 means infinity.
+    """
+    def lock_timeout(self):
+        if self.conf['lock']['timeout_s'] <= 0:
+            # Kinda infinite
+            return 3600*24*365*100
+        return self.conf['lock']['timeout_s']
+
+    """ 
+        Return the maximum amount of time (in seconds) we try to access a locked file before throwing an exception to the user.
+        Value <= 0 means infinity.
+    """
+    def lock_access_attempt(self):
+        if self.conf['lock']['access_attempt_s'] <= 0:
+            # Kinda infinite
+            return 3600*24*365*100
+        return self.conf['lock']['access_attempt_s']
+
+    """
+        Return the hostname of the current server
+    """
+    def hostname(self):
+        return self.conf['host']

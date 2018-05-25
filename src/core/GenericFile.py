@@ -47,6 +47,7 @@ class GenericFile:
         self.generic_file_type = json['generic_file_type']
         self.metadata = json['metadata']
         self.attrs = json.get('attrs',{})
+        self.lock = json.get('lock',{})
         self.length = json['length']
 
     """
@@ -76,10 +77,17 @@ class GenericFile:
         return False
 
     """
-        Rename a file to another filename
+        Rename a generic file to another filename
     """
     def rename_to(self, filename):
         GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filename=filename)
+
+    """
+        Try to release a lock on a generic file. The lock is initially generated when we try to load the file, so there
+        is no method here for the opposite management of lock. 
+    """
+    def unlock(self):
+        return GenericFile.mongo.unlock_generic_file(generic_file=self)
 
     """
         Return an instance of a file / directory when we want to create a new one

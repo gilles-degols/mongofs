@@ -26,12 +26,10 @@ Features development:
 - [x] Manage special attributes on files (for selinux)
 - [x] Set access / update time of a directory / file / symbolic link
 - [x] Handle rename of files / directories / links
-- [ ] Handle cursor, ...
-- [ ] Performance improvement (caching, ...)
+- [x] File Lock - Experimental (based on the PID)
+- [ ] Performance improvement (caching, indexes, ...)
 - [ ] Scalability test
 - [ ] Handling unreachable MongoDB instance
-- [ ] Rollback
-- [ ] File Lock
 - [ ] Unit testing
 - [ ] First stable release
 

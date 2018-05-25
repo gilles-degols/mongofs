@@ -1,19 +1,26 @@
 #!/usr/bin/env python
+import errno
+from math import floor, ceil
+from errno import ENOENT, EDEADLOCK
+import time
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
+
 from pymongo import MongoClient
 import gridfs
-import errno
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from pymongo.collection import ReturnDocument
 
 from core.Configuration import Configuration
 from core.GenericFile import GenericFile
 from core.File import File
 from core.Directory import Directory
 from core.SymbolicLink import SymbolicLink
-from math import floor, ceil
 
 class Mongo:
     instance = None
     configuration = None
+
+    LOCKED_FILE = 1
+    FILE_NOT_FOUND = 2
 
     def __init__(self):
         # We reuse the same connexion
@@ -55,6 +62,38 @@ class Mongo:
         Mongo.instance = MongoClient(mongo_path)
 
     """
+        Some information about the current user.
+    """
+    @staticmethod
+    def current_user():
+        raw = fuse_get_context()
+        return {'uid':raw[0],'gid':raw[1],'pid':raw[2]}
+
+    """
+        Give the appropriate lock id containing:
+            filename
+            pid
+            hostname            
+    """
+    @staticmethod
+    def lock_id(filename):
+        lock_id = filename + ';' + str(Mongo.current_user()['pid']) + ';' + str(Mongo.configuration.hostname())
+        return lock_id
+
+    """
+        Give the master lock id containing:
+            filename
+            pid -> 0
+            hostname
+        This "master" lock id is used to unlock specific locked file, as we sometimes receive an unlock order with the 
+        PID 0, and we need to fulfill it anyway
+    """
+    @staticmethod
+    def master_lock_id(filename):
+        lock_id = filename + ';' + str(0) + ';' + str(Mongo.configuration.hostname())
+        return lock_id
+
+    """
         Create a generic file in gridfs. No need to return it.
     """
     def create_generic_file(self, generic_file):
@@ -94,13 +133,85 @@ class Mongo:
         return self.get_generic_file(filename=filename) is not None
 
     """
-        Retrieve any file / directory / link document from Mongo. Returns None if none are found.
+        Wrapper around get_generic_file_internal() in charge of waiting x seconds before throwing a "LOCKED_FILE" exception 
+        to the user.
+        Return a 
+         GenericFile instance, if there is one matching file available
+         Throw an error if there is lock
+         None if the file is not found
     """
-    def get_generic_file(self, filename):
-        f = self.files_coll.find_one({'filename': filename})
-        if f is not None:
-            return Mongo.load_generic_file(f)
-        return None
+    def get_generic_file(self, filename, take_lock=False):
+        dt = time.time()
+        lock_max_access = Mongo.configuration.lock_access_attempt()
+        gf = Mongo.LOCKED_FILE
+
+        if take_lock is True:
+            lock_id = Mongo.lock_id(filename=filename)
+        else:
+            lock_id = None
+
+        while gf == Mongo.LOCKED_FILE and dt + lock_max_access >= time.time():
+            gf = self.get_generic_file_internal(filename=filename, lock=lock_id)
+            if gf == Mongo.LOCKED_FILE:
+                # Wait 1s before checking the lock again
+                time.sleep(1)
+            elif gf == Mongo.FILE_NOT_FOUND:
+                return None
+            else:
+                return gf
+
+        # It means the file is still locked
+        raise FuseOSError(EDEADLOCK)
+
+    """
+        Retrieve any file / directory / link document from Mongo. 
+        If "lock" contains a lock id (versus None), we only return the generic file if we were able to put the lock on it directly.
+        Be careful: If one process did not put a lock, and another wants to add it, it will be able to do it obviously.
+        Returns 
+         GenericFile instance (child of that class in fact)
+         Mongo.LOCKED_FILE if the file is currently locked (we tried to access it multiple times during a short amount of time before returning that information)
+         Mongo.FILE_NOT_FOUND None if none are found.
+    """
+    def get_generic_file_internal(self, filename, lock=None):
+        dt = time.time()
+        dt_timeout = dt + Mongo.configuration.lock_timeout()
+
+        # The same process could be the one having created the lock, so we need to let him have access to the file
+        current_process_lock = Mongo.lock_id(filename=filename)
+        master_process_lock = Mongo.master_lock_id(filename=filename)
+        if lock is not None:
+            gf = self.files_coll.find_one_and_update({'filename': filename,'lock':{'$exists':False}},
+                                                     {'$set':{'lock':{'creation':dt,'id':lock}}},
+                                                    return_document=ReturnDocument.AFTER)
+            if gf is None:
+                # File might not exist, we don't know for sure.
+                gf = self.files_coll.find_one({'filename': filename})
+                if gf is None:
+                    return Mongo.FILE_NOT_FOUND
+                elif gf['lock']['creation'] >= dt_timeout:
+                    diff = int(dt - gf['lock']['creation'])
+                    print('Lock for '+filename+' was created/updated '+str(diff)+'s ago. Maximum timeout is '+
+                          str(Mongo.configuration.lock_timeout()+', so we remove the lock (if it was not taken by another '+
+                          'process right now).'))
+                    self.files_coll.find_one_and_update({'filename': filename, 'lock.id':gf['lock']['id']},
+                                                          {'$unset':{'lock':''}}, return_document=ReturnDocument.AFTER)
+                    return self.get_generic_file_internal(filename=filename, lock=lock)
+                elif gf['lock']['id'] == current_process_lock:
+                    # It means it was the same that acquired the log, so he can have access to the file
+                    return Mongo.load_generic_file(gf)
+                else:
+                    return Mongo.LOCKED_FILE
+            return Mongo.load_generic_file(gf)
+        else:
+            # We don't really need to verify the lock directly in the MongoDB query, the logic will be outside MongoDB anyway
+            gf = self.files_coll.find_one({'filename': filename})
+            if gf is not None:
+                if 'lock' in gf and gf['lock']['id'] != current_process_lock and current_process_lock != master_process_lock:
+                    return Mongo.LOCKED_FILE
+                else:
+                    return Mongo.load_generic_file(gf)
+            return Mongo.FILE_NOT_FOUND
+
     """
         Increment/reduce the number of links for a directory 
     """
@@ -226,7 +337,25 @@ class Mongo:
         directory = GenericFile.get_directory(filename=destination_filename)
         self.add_nlink_directory(directory=directory, value=-1)
 
+    """
+        Remove a lock to a generic file (only if we are owner of it). We do not care about the lock type. 
+    """
+    def unlock_generic_file(self, generic_file):
+        lock_id = Mongo.lock_id(filename=generic_file.filename)
+        master_lock_id = Mongo.master_lock_id(filename=generic_file.filename)
+        if 'id' not in generic_file.lock or lock_id not in [master_lock_id, generic_file.lock['id']]:
+            print('Trying to release a non-existing lock, or one that we do not own. We do nothing.')
+            return True
 
+        # For now, if we have a master-lock, we need to remove any lock. In that case, we should still verify that the lock
+        # is released by the appropriate host (TODO).
+        if lock_id == master_lock_id:
+            self.files_coll.find_one_and_update({'_id': generic_file._id},
+                                                {'$unset': {'lock': ''}}, return_document=ReturnDocument.AFTER)
+        else:
+            self.files_coll.find_one_and_update({'_id': generic_file._id, 'lock.id': lock_id},
+                                                {'$unset': {'lock': ''}}, return_document=ReturnDocument.AFTER)
+        return True
 
     """
         Update some arbitrary fields in the general "files" object
