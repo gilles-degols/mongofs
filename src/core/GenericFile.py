@@ -76,6 +76,12 @@ class GenericFile:
         return False
 
     """
+        Rename a file to another filename
+    """
+    def rename_to(self, filename):
+        GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filename=filename)
+
+    """
         Return an instance of a file / directory when we want to create a new one
     """
     @staticmethod

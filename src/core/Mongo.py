@@ -206,6 +206,29 @@ class Mongo:
         return True
 
     """
+        Rename a generic file to another name
+         generic_file: Instance of a GenericFile type object
+         destination_filename: Expected filename
+    """
+    def rename_generic_file_to(self, generic_file, destination_filename):
+        # There is no need to verify if the destination directory exists, and if there is not already a file with the same name,
+        # as FUSE will automatically verify those conditions before calling our implementation of file moving.
+
+        # First we decrease the number of nlink in the directory above (even if we might stay in the same repository
+        # at the end, that's not a big deal)
+        directory = GenericFile.get_directory(filename=generic_file.filename)
+        self.add_nlink_directory(directory=directory, value=-1)
+
+        # We rename it
+        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'filename':destination_filename}})
+
+        # We increase the number of nlink in the final directory
+        directory = GenericFile.get_directory(filename=destination_filename)
+        self.add_nlink_directory(directory=directory, value=-1)
+
+
+
+    """
         Update some arbitrary fields in the general "files" object
     """
     def basic_save(self, generic_file, metadata, attrs):

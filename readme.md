@@ -25,7 +25,7 @@ Features development:
 - [x] Manage ownership owner & group
 - [x] Manage special attributes on files (for selinux)
 - [x] Set access / update time of a directory / file / symbolic link
-- [ ] Handle rename of files / directories / links
+- [x] Handle rename of files / directories / links
 - [ ] Handle cursor, ...
 - [ ] Performance improvement (caching, ...)
 - [ ] Scalability test
@@ -33,6 +33,7 @@ Features development:
 - [ ] Rollback
 - [ ] File Lock
 - [ ] Unit testing
+- [ ] First stable release
 
 What is not possible with MongoFS:
 
