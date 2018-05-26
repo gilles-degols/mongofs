@@ -1,6 +1,7 @@
 import unittest
 import json
 from bson import json_util
+from fuse import FuseOSError
 
 from src.core.Configuration import Configuration
 from src.core.Mongo import Mongo
@@ -27,6 +28,9 @@ class TestMongo(unittest.TestCase):
             self.symbolic_link_raw = json_util.loads(f.read())
         self.symbolic_link = self.obj.load_generic_file(self.symbolic_link_raw)
 
+        with open('test/resources/data/directory-file.json','r') as f:
+            self.directory_file_raw = json_util.loads(f.read())
+        self.directory_file = self.obj.load_generic_file(self.directory_file_raw)
 
     def tearDown(self):
         self.obj.clean_database()
@@ -83,7 +87,23 @@ class TestMongo(unittest.TestCase):
         self.assertEqual(gf, None)
 
     def test_remove_generic_file_directory_not_empty(self):
-        pass
+        # Try to delete the parent directory while a file still exist in it
+        self.obj.create_generic_file(generic_file=self.directory)
+        self.obj.create_generic_file(generic_file=self.directory_file)
+        try:
+            self.obj.remove_generic_file(generic_file=self.directory)
+            self.assertTrue(False)
+        except FuseOSError as e:
+            self.assertTrue(True)
+
+    def test_remove_generic_file_directory_empty(self):
+        # Try to delete the parent directory after deleting the file in it
+        self.obj.create_generic_file(generic_file=self.directory)
+        self.obj.create_generic_file(generic_file=self.directory_file)
+        self.obj.remove_generic_file(generic_file=self.directory_file)
+        self.obj.remove_generic_file(generic_file=self.directory)
+        self.assertTrue(True)
+
 
 if __name__ == '__main__':
     unittest.main()
