@@ -1,5 +1,5 @@
 {
-    "_id" : {"$oid":"5b0964fdeb0a190618865767"},
+    "_id" : {"$oid":"5b099c56eb0a190b65ec80ad"},
     "directory" : "/",
     "filename" : "/truc",
     "generic_file_type" : 1,
@@ -13,7 +13,7 @@
     },
     "length" : 0,
     "md5" : "d41d8cd98f00b204e9800998ecf8427e",
-    "chunkSize" : 261120,
+    "chunkSize" : 4,
     "attrs" : {
     }
 }

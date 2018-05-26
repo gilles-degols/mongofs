@@ -238,9 +238,14 @@ class Mongo:
         starting_chunk = int(floor(offset / chunk_size))
         ending_chunk = int(floor((offset + size) / chunk_size))
 
+        starting_offset = offset % chunk_size
+        ending_size = chunk_size
         data = b''
         for chunk in self.chunks_coll.find({'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
-            data += chunk['data']
+            if chunk['n'] == ending_chunk:
+                ending_size = size % chunk_size
+            data += chunk['data'][starting_offset:ending_size]
+            starting_offset = 0
         return data
 
     """
