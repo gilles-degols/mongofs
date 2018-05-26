@@ -17,20 +17,14 @@ class TestMongo(unittest.TestCase):
         # To ease some tests
         with open('test/resources/data/file.json','r') as f:
             self.file_raw = json_util.loads(f.read())
-            del self.file_raw['_id']
-            del self.file_raw['uploadDate']
         self.file = self.obj.load_generic_file(self.file_raw)
 
         with open('test/resources/data/directory.json','r') as f:
             self.directory_raw = json_util.loads(f.read())
-            del self.directory_raw['_id']
-            del self.directory_raw['uploadDate']
         self.directory = self.obj.load_generic_file(self.directory_raw)
 
         with open('test/resources/data/symbolic-link.json','r') as f:
             self.symbolic_link_raw = json_util.loads(f.read())
-            del self.symbolic_link_raw['_id']
-            del self.symbolic_link_raw['uploadDate']
         self.symbolic_link = self.obj.load_generic_file(self.symbolic_link_raw)
 
 
@@ -79,11 +73,17 @@ class TestMongo(unittest.TestCase):
 
     def test_create_generic_file(self):
         self.obj.create_generic_file(generic_file=self.file)
-        gf = self.obj.files_coll.find_one({'filename':self.file.filename})
-        del gf['_id']
-        del gf['uploadDate']
-        self.assertEqual(gf, self.file_raw)
+        gf = self.obj.files_coll.find_one({'filename':self.file.filename},{'uploadDate':False})
+        self.assertEqual(json_util.dumps(gf), json_util.dumps(self.file_raw))
 
+    def test_remove_generic_file(self):
+        self.obj.create_generic_file(generic_file=self.file)
+        self.obj.remove_generic_file(generic_file=self.file)
+        gf = self.obj.files_coll.find_one({'filename': self.file.filename})
+        self.assertEqual(gf, None)
+
+    def test_remove_generic_file_directory_not_empty(self):
+        pass
 
 if __name__ == '__main__':
     unittest.main()

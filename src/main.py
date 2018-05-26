@@ -28,11 +28,11 @@ class MongoFS(LoggingMixIn, Operations):
 
         # START DEBUG ONLY - Drop the old information from MongoDB
         self.mongo.clean_database()
+        self.mongo = Mongo() # Create a new instance to be sure to have the top folder
         # END DEBUG ONLY
 
         # We need to be sure to have the top folder created in MongoDB
-        self.mkdir(path='/', mode=0o755)
-
+        #self.mkdir(path='/', mode=0o755)
     """
         Create a file and returns a "file descriptor", which is in fact, simply the _id.
     """

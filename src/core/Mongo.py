@@ -39,6 +39,10 @@ class Mongo:
         self.files_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.files']
         self.chunks_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.chunks']
 
+        # We need to be sure to have the top folder created in MongoDB
+        GenericFile.mongo = self
+        GenericFile.new_generic_file(filename='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+
     """
         Establish a connection to mongodb
     """
@@ -101,7 +105,7 @@ class Mongo:
         f.close()
 
     """
-        Remove a generic file.
+        Remove a generic file. No need to verify if the file already exists, the check is done by FUSE.
     """
     def remove_generic_file(self, generic_file):
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
