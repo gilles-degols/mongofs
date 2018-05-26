@@ -3,7 +3,7 @@ from src.core.Configuration import Configuration
 
 class TestConfiguration(unittest.TestCase):
     def setUp(self):
-        Configuration.FILEPATH = 'conf/mongofs.json'
+        Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
         self.obj = Configuration()
 
     def tearDown(self):
@@ -13,10 +13,10 @@ class TestConfiguration(unittest.TestCase):
         self.assertEqual(self.obj.mongo_hosts(), ["127.0.0.1:27017"])
 
     def test_mongo_database(self):
-        self.assertEqual(self.obj.mongo_database(), "mongofs")
+        self.assertEqual(self.obj.mongo_database(), "mongofsTests")
 
     def test_mongo_prefix(self):
-        self.assertEqual(self.obj.mongo_prefix(), "mongofs_")
+        self.assertEqual(self.obj.mongo_prefix(), "mongofsTests_")
 
     def test_lock_timeout(self):
         self.assertEqual(self.obj.lock_timeout(), 6)

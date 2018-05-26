@@ -1,4 +1,4 @@
-from core.GenericFile import GenericFile
+from src.core.GenericFile import GenericFile
 
 class File(GenericFile):
     """

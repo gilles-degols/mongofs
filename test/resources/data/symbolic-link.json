@@ -1,0 +1,19 @@
+{
+    "_id" : {"$oid":"5b09650deb0a190618865768"},
+    "directory" : "/",
+    "filename" : "/tata",
+    "generic_file_type" : 3,
+    "metadata" : {
+        "st_size" : 5,
+        "st_ctime" : 1527342349.4137955,
+        "st_mtime" : 1527342349.4137955,
+        "st_atime" : 1527342349.4137955,
+        "st_nlink" : 1,
+        "st_mode" : 41471
+    },
+    "length" : 0,
+    "target" : "/mnt/data/truc",
+    "md5" : "d41d8cd98f00b204e9800998ecf8427e",
+    "chunkSize" : 261120,
+    "uploadDate" : {"$date":"2018-05-26T13:45:49.415Z"}
+}

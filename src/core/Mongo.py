@@ -9,11 +9,11 @@ from pymongo import MongoClient
 import gridfs
 from pymongo.collection import ReturnDocument
 
-from core.Configuration import Configuration
-from core.GenericFile import GenericFile
-from core.File import File
-from core.Directory import Directory
-from core.SymbolicLink import SymbolicLink
+from src.core.Configuration import Configuration
+from src.core.GenericFile import GenericFile
+from src.core.File import File
+from src.core.Directory import Directory
+from src.core.SymbolicLink import SymbolicLink
 
 class Mongo:
     instance = None
@@ -40,6 +40,13 @@ class Mongo:
         self.chunks_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.chunks']
 
     """
+        Establish a connection to mongodb
+    """
+    def connect(self):
+        mongo_path = 'mongodb://' + ','.join(Mongo.configuration.mongo_hosts())
+        Mongo.instance = MongoClient(mongo_path)
+
+    """
         Load the appropriate object for the given json. Should never return a GenericFile, but rather a child class.
     """
     @staticmethod
@@ -53,13 +60,6 @@ class Mongo:
         else:
             print('Unsupported file type!')
             return GenericFile(json)
-
-    """
-        Establish a connection to mongodb
-    """
-    def connect(self):
-        mongo_path = 'mongodb://' + ','.join(Mongo.configuration.mongo_hosts())
-        Mongo.instance = MongoClient(mongo_path)
 
     """
         Some information about the current user.

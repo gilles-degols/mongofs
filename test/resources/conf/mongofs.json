@@ -1,8 +1,8 @@
 {
   "mongo": {
     "hosts": ["127.0.0.1:27017"],
-    "database": "mongofs",
-    "prefix": "mongofs_"
+    "database": "mongofsTests",
+    "prefix": "mongofsTests_"
   },
   "host": "localhost",
   "lock":{

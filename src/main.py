@@ -6,11 +6,11 @@ from sys import argv, exit
 from errno import ENOENT
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
-from core.Configuration import Configuration
-from core.GenericFile import GenericFile
-from core.File import File
-from core.SymbolicLink import SymbolicLink
-from core.Mongo import Mongo
+from src.core.Configuration import Configuration
+from src.core.GenericFile import GenericFile
+from src.core.File import File
+from src.core.SymbolicLink import SymbolicLink
+from src.core.Mongo import Mongo
 
 """
     Simulate a file system running on MongoDB.
