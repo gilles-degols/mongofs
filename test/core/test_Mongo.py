@@ -52,6 +52,12 @@ class TestMongo(unittest.TestCase):
     def insert_symbolic_link(self):
         self.obj.files_coll.insert_one(self.symbolic_link_raw)
 
+    def read_file_chunks(self):
+        message = b''
+        for chunk in self.obj.chunks_coll.find({'files_id':self.file._id}):
+            message += chunk['data']
+        return message
+
     def tearDown(self):
         self.obj.clean_database()
 
@@ -158,7 +164,7 @@ class TestMongo(unittest.TestCase):
     def test_read_data(self):
         self.insert_file()
         self.insert_file_chunks()
-        message = b'First hello world. Second hello world.\n'
+        message = self.read_file_chunks()
 
         data = self.obj.read_data(file=self.file, offset=0, size=4096)
         self.assertEqual(data, message)
@@ -171,6 +177,75 @@ class TestMongo(unittest.TestCase):
 
         data = self.obj.read_data(file=self.file, offset=3, size=8)
         self.assertEqual(data, message[3:8])
+
+    def test_add_data_append(self):
+        self.insert_file()
+        self.insert_file_chunks()
+        message = self.read_file_chunks()
+
+        self.obj.add_data(file=self.file, data=b'test', offset=len(message))
+        modified_message = self.read_file_chunks()
+        self.assertEqual(modified_message, message+b'test')
+
+    def test_add_data_replace(self):
+        self.insert_file()
+        self.insert_file_chunks()
+        message = self.read_file_chunks()
+        message = list(message)
+        message[2] = ord('t')
+        message[3] = ord('h')
+        message[4] = ord('i')
+        message[5] = ord('n')
+        message[6] = ord('g')
+        message[7] = ord('s')
+        expected_message = ''.join(map(chr, message))
+
+        self.obj.add_data(file=self.file, data=b'things', offset=2)
+        modified_message = self.read_file_chunks()
+        formatted_modified_message = ''.join(map(chr, list(modified_message)))
+        self.assertEqual(formatted_modified_message, expected_message)
+
+    def test_truncate(self):
+        self.insert_file()
+        self.insert_file_chunks()
+        message = self.read_file_chunks()
+
+        self.obj.truncate(file=self.file, length=6)
+        modified_message = self.read_file_chunks()
+        self.assertEqual(modified_message, message[0:6])
+
+    def test_truncate_zero(self):
+        self.insert_file()
+        self.insert_file_chunks()
+        message = self.read_file_chunks()
+
+        self.obj.truncate(file=self.file, length=0)
+        modified_message = self.read_file_chunks()
+        self.assertEqual(modified_message, message[0:0])
+
+    def test_rename_generic_file_to(self):
+        self.insert_file()
+        self.insert_file_chunks()
+        message = self.read_file_chunks()
+
+        self.obj.rename_generic_file_to(generic_file=self.file, destination_filename='rename-test')
+        destination_message = self.read_file_chunks() # Read chunks is based on the _id, so we can call it
+        # Normally, the chunks should not change at all, but we never know.
+        self.assertEqual(destination_message, message)
+
+        old_file = self.obj.files_coll.find_one({'filename':self.file.filename})
+        self.assertEqual(old_file, None)
+
+        new_file = self.obj.files_coll.find_one({'filename': 'rename-test'})
+        self.assertNotEqual(new_file, None)
+
+    def test_unlock_generic_file(self):
+        # TODO
+        pass
+
+    def test_basic_save(self):
+        # TODO
+        pass
 
 if __name__ == '__main__':
     unittest.main()

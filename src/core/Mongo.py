@@ -291,7 +291,7 @@ class Mongo:
                     "data": data[0:chunk_size],
                     "n": total_chunks
                 }
-                self.chunks_coll.save(chunk)
+                self.chunks_coll.insert_one(chunk)
 
                 # We have written a part of what we wanted, we only the keep the remaining
                 data = data[chunk_size:]
@@ -318,7 +318,7 @@ class Mongo:
         # We update the last chunk
         if length % chunk_size != 0:
             last_chunk = self.chunks_coll.find_one({'files_id':file._id,'n':maximum_chunks-1})
-            last_chunk = last_chunk['data'][0:length % chunk_size]
+            last_chunk['data'] = last_chunk['data'][0:length % chunk_size]
             self.chunks_coll.find_one_and_update({'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
 
         # We update the total length and that's it
