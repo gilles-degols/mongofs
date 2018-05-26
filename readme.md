@@ -27,10 +27,10 @@ Features development:
 - [x] Set access / update time of a directory / file / symbolic link
 - [x] Handle rename of files / directories / links
 - [x] File Lock - Experimental (based on the PID)
+- [ ] Unit testing - Work in progress
 - [ ] Performance improvement (caching, indexes, ...)
 - [ ] Scalability test
 - [ ] Handling unreachable MongoDB instance
-- [ ] Unit testing
 - [ ] First stable release
 
 What is not possible with MongoFS:
@@ -53,7 +53,14 @@ python3.6 -m pip install --upgrade pip
 python3.6 -m pip remove fuse # Otherwise conflicts can happen with fusepy
 python3.6 -m pip install  -r requirements.txt
 ```
-2. Mount the file system in a temporary directory
+
+2. Run the tests
+
+```
+python3.6 -m unittest discover -v
+```
+
+3. Mount the file system in a temporary directory
 
 By default the configuration file is in /etc/mongofs/mongofs.json. You can give an alternative path in the command line
 directly, as second argument.
@@ -65,4 +72,3 @@ python3.6 src/main.py /mnt/data
 python3.6 src/main.py /mnt/data /root/mongofs/conf/mongofs.json
 ```
 Important note: As this is still a project in development, the database is automatically cleaned each time you mount the file system. This option will be moved to the configuration file soon.
-
