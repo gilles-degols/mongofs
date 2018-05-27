@@ -23,8 +23,7 @@ class TestIntegration(unittest.TestCase):
         self.execute_background_command(command=TestIntegration.START_COMMAND)
 
     def execute_command(self, command):
-        res = subprocess.run([command], shell=True, stdout=subprocess.PIPE)
-        res.stdout = res.stdout.decode('utf-8')
+        res = subprocess.run([command], shell=True, stdout=subprocess.PIPE, bufsize=1, universal_newlines=True)
         return res
 
     def execute_background_command(self, command):
@@ -35,6 +34,8 @@ class TestIntegration(unittest.TestCase):
             if touch_result.returncode != 0:
                 time.sleep(0.05*(i+1))
             else:
+                # Clean up to avoid any problem with the tests.
+                self.execute_command(command='rm '+TestIntegration.TEST_DIRECTORY+'/hello-start')
                 return True
         exit(1)
 
@@ -44,9 +45,66 @@ class TestIntegration(unittest.TestCase):
     def tearDown(self):
         self.kill_background_command(command=TestIntegration.START_COMMAND)
 
+    def list_directory_content(self, directory=''):
+        res = self.execute_command(command='ls ' + TestIntegration.TEST_DIRECTORY + '/' + directory + ' -lv')
+        files = []
+        for elem in res.stdout.split('\n'):
+            info = elem.strip().split()
+            if len(info) <= 2:
+                # The first line is not interesting (with a "total" information)
+                continue
+            attributes = info[0]
+            owner = info[2]
+            group = info[3]
+            size = int(info[4])
+            filename = info[-1]
+            file = {'attributes':attributes,'owner':owner,'group':group,'size':size, 'filename':filename}
+            files.append(file)
+        return files
+
     def test_touch(self):
         res = self.execute_command(command='touch '+TestIntegration.TEST_DIRECTORY+'/hello')
         self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello')
+
+    def test_rm(self):
+        self.execute_command(command='touch '+TestIntegration.TEST_DIRECTORY+'/hello')
+        res = self.execute_command(command='rm '+TestIntegration.TEST_DIRECTORY+'/hello')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 0)
+
+    def test_write(self):
+        res = self.execute_command(command='echo "some text" > ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello')
+        self.assertEqual(files[0]['size'], len("some test\n"))
+
+    def test_read(self):
+        self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.assertEqual(res.stdout.strip(), "some text")
+
+    def test_mkdir(self):
+        res = self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello')
+        self.assertEqual(files[0]['attributes'][0], "d")
+
+    def test_mkdir_and_file(self):
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='touch ' + TestIntegration.TEST_DIRECTORY + '/hello/subfile')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content(directory='hello/')
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'subfile')
+
 
 if __name__ == '__main__':
     unittest.main()
