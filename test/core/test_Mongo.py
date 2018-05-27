@@ -240,12 +240,28 @@ class TestMongo(unittest.TestCase):
         self.assertNotEqual(new_file, None)
 
     def test_unlock_generic_file(self):
-        # TODO
-        pass
+        self.insert_file()
+        gf = self.obj.get_generic_file(filename=self.file.filename, take_lock=True)
+        result = self.obj.unlock_generic_file(generic_file=gf)
+        self.assertTrue(result)
+
+        gf = self.obj.get_generic_file(filename=self.file.filename)
+        self.assertTrue('lock' not in gf.json)
+
+    def test_unlock_generic_file_no_lock(self):
+        # Verify if it does not crash if there is no lock
+        self.insert_file()
+        gf = self.obj.get_generic_file(filename=self.file.filename, take_lock=False)
+        result = self.obj.unlock_generic_file(generic_file=gf)
+        self.assertTrue(result)
 
     def test_basic_save(self):
-        # TODO
-        pass
+        self.insert_file()
+        self.obj.basic_save(generic_file=self.file, metadata={'st_nlink':1}, attrs={'thing':1})
+        result = self.obj.files_coll.find_one({'filename':self.file.filename})
+        self.assertTrue('st_nlink' in result['metadata'] and len(result['metadata']) == 1)
+        self.assertTrue('thing' in result['attrs'] and len(result['attrs']) == 1)
+
 
 if __name__ == '__main__':
     unittest.main()
