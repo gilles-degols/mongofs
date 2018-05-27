@@ -53,7 +53,8 @@ class GenericFile:
     """
         Save specific fields modification of the current object to MongoDB. We do not allow
         the developer to directly update the "filename" or "chunkSize" for example. We only
-        allow the update of a few fields (metadata for example) 
+        allow the update of a few fields (metadata for example).
+        This method will not work for a new generic-file, it must be created by new_generic_file.
     """
     def basic_save(self):
         GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs)
@@ -81,6 +82,7 @@ class GenericFile:
     """
     def rename_to(self, filename):
         GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filename=filename)
+        self.filename = filename
 
     """
         Try to release a lock on a generic file. The lock is initially generated when we try to load the file, so there

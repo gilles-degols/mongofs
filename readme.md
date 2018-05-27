@@ -57,7 +57,14 @@ python3.6 -m pip install  -r requirements.txt
 2. Run the tests
 
 ```
+# Run all tests
 python3.6 -m unittest discover -v
+
+# Run all tests of a class:
+python3.6 -m unittest -v test.core.test_GenericFile
+
+# Run one specific test
+python3.6 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_save
 ```
 
 3. Mount the file system in a temporary directory

@@ -14,10 +14,11 @@ class Utils:
         self.file_raw = None
         self.directory = None
         self.directory_raw = None
-        self.symbolic_link_file = None
-        self.symbolic_link_file_raw = None
+        self.symbolic_link = None
+        self.symbolic_link_raw = None
         self.directory_file = None
         self.directory_file_raw = None
+        self.file_chunks_raw = None
 
     def load_files(self):
         # Load various files as setUp
@@ -34,7 +35,7 @@ class Utils:
 
         with open('test/resources/data/symbolic-link.json', 'r') as f:
             self.symbolic_link_raw = json_util.loads(f.read())
-        self.symbolic_link_file = self.mongo.load_generic_file(self.symbolic_link_raw)
+        self.symbolic_link = self.mongo.load_generic_file(self.symbolic_link_raw)
 
         with open('test/resources/data/directory-file.json', 'r') as f:
             self.directory_file_raw = json_util.loads(f.read())
