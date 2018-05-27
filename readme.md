@@ -75,7 +75,7 @@ directly, as second argument.
 mkdir -p /mnt/data
 python3.6 -m src.main /mnt/data
 
-# With a specific configuration filepath
-python3.6 -m src.main /mnt/data /root/mongofs/conf/mongofs.json
+# With a specific configuration filepath (absolute or relative)
+python3.6 -m src.main /mnt/data conf/mongofs.json
 ```
 Important note: As this is still a project in development, the database is automatically cleaned each time you mount the file system. This option will be moved to the configuration file soon.
