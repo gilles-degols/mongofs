@@ -23,7 +23,7 @@ class TestIntegration(unittest.TestCase):
         self.execute_background_command(command=TestIntegration.START_COMMAND)
 
     def execute_command(self, command):
-        res = subprocess.run([command], shell=True, stdout=subprocess.PIPE, bufsize=1, universal_newlines=True)
+        res = subprocess.run([command], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
         return res
 
     def execute_background_command(self, command):
@@ -104,6 +104,88 @@ class TestIntegration(unittest.TestCase):
         files = self.list_directory_content(directory='hello/')
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]['filename'], 'subfile')
+
+    def test_rmdir_empty(self):
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='rmdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 0)
+
+    def test_rmdir_full(self):
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.execute_command(command='touch ' + TestIntegration.TEST_DIRECTORY + '/hello/subfile')
+        res = self.execute_command(command='rmdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        self.assertEqual(res.returncode, 1)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+
+    def test_symbolic_link(self):
+        self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='ln -s ' + TestIntegration.TEST_DIRECTORY + '/hello '+ TestIntegration.TEST_DIRECTORY + '/link')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 2)
+        res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/link')
+        self.assertEqual(res.stdout.strip(), "some text")
+
+    def test_symbolic_link_invalid_target(self):
+        # It is normal to return "0" even if the target does not exist, this is the same behavior in other file systems.
+        res = self.execute_command(command='ln -s ' + TestIntegration.TEST_DIRECTORY + '/hello '+ TestIntegration.TEST_DIRECTORY + '/link')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+
+    def test_file_rename_file(self):
+        self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='mv ' + TestIntegration.TEST_DIRECTORY + '/hello ' + TestIntegration.TEST_DIRECTORY + '/hello2')
+        self.assertEqual(res.returncode, 0)
+        res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/hello2')
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(res.stdout.strip(), "some text")
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello2')
+
+    def test_file_rename_directory_empty(self):
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='mv ' + TestIntegration.TEST_DIRECTORY + '/hello ' + TestIntegration.TEST_DIRECTORY + '/hello2')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello2')
+        self.assertEqual(files[0]['attributes'][0], "d")
+
+    def test_file_rename_directory_full(self):
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/dir0')
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/dir0/dir1')
+        self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/dir0/dir1/dir2')
+        self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/dir0/dir1/dir2/hello')
+        res = self.execute_command(command='mv ' + TestIntegration.TEST_DIRECTORY + '/dir0 ' + TestIntegration.TEST_DIRECTORY + '/renamed-dir0')
+        self.assertEqual(res.returncode, 0)
+        files = self.list_directory_content()
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'renamed-dir0')
+        self.assertEqual(files[0]['attributes'][0], "d")
+
+        files = self.list_directory_content(directory='renamed-dir0')
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'dir1')
+        self.assertEqual(files[0]['attributes'][0], "d")
+
+        files = self.list_directory_content(directory='renamed-dir0/dir1')
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'dir2')
+        self.assertEqual(files[0]['attributes'][0], "d")
+
+        files = self.list_directory_content(directory='renamed-dir0/dir1/dir2')
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]['filename'], 'hello')
+        self.assertNotEqual(files[0]['attributes'][0], "d")
+
+        res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/renamed-dir0/dir1/dir2/hello')
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(res.stdout.strip(), "some text")
 
 
 if __name__ == '__main__':
