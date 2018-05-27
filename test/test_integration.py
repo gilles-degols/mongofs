@@ -10,8 +10,8 @@ from src.core.Configuration import Configuration
     This is super-ugly as code, but useful at least.
 """
 class TestIntegration(unittest.TestCase):
-    TEST_DIRECTORY = '/mnt/mongofs-integration-test-56789456'
-    START_COMMAND = 'nohup python3.6 -m src.main /mnt/data test/resources/conf/mongofs.json >/dev/null 2>&1 &'
+    TEST_DIRECTORY = '/mnt/mongofs-integration-test'
+    START_COMMAND = 'nohup python3.6 -m src.main '+TEST_DIRECTORY+' test/resources/conf/mongofs.json >/dev/null 2>&1 &'
 
     def setUp(self):
         commands = [
@@ -28,30 +28,57 @@ class TestIntegration(unittest.TestCase):
 
     def execute_background_command(self, command):
         subprocess.run([command], shell=True, stdout=subprocess.PIPE)
-        # We cannot be sure that the file system is directly accessible (it might take a few ms). So we verify it.
+        # We cannot be sure that the file system is directly accessible (it might take a few ms). And we could be trying
+        # to read to the local file system instead, so we need to verify if the mounting was correctly done.
         for i in range(0, 10):
-            touch_result = self.execute_command(command='touch '+TestIntegration.TEST_DIRECTORY+'/hello-start')
+            touch_result = self.execute_command(command='mountpoint -q '+TestIntegration.TEST_DIRECTORY)
             if touch_result.returncode != 0:
                 time.sleep(0.05*(i+1))
             else:
-                # Clean up to avoid any problem with the tests.
-                self.execute_command(command='rm '+TestIntegration.TEST_DIRECTORY+'/hello-start')
                 return True
+        print('Impossible to mount the file system in the given time. Abort.')
         exit(1)
 
     def kill_background_command(self, command):
-        self.execute_command(command='pkill -f "'+command+'"')
+        self.execute_command(command='pkill -9 -f "'+command+'"')
+
+    def close_mount(self):
+        # Some work to be able to really close the file system correctly...
+        fuse_command = 'fusermount -u '+TestIntegration.TEST_DIRECTORY
+        rmdir_command = 'rmdir '+TestIntegration.TEST_DIRECTORY
+        for i in range(0, 100):
+            self.execute_command(command=fuse_command)
+            self.execute_command(command=rmdir_command)
+            directory_above = '/'.join(TestIntegration.TEST_DIRECTORY.split('/')[0:-1])
+            files = self.list_directory_content(directory=directory_above, absolute=True)
+
+            found_directory = False
+            for file in files:
+                if file['filename'] == TestIntegration.TEST_DIRECTORY.split('/')[-1]:
+                    found_directory = True
+            if found_directory is True:
+                time.sleep(0.05 * (i + 1))
+            else:
+                return True
+        print('Impossible to umount the file system in the given time. Abort.')
+        exit(1)
 
     def tearDown(self):
+        self.close_mount()
+        # It might be necessary some times...
         self.kill_background_command(command=TestIntegration.START_COMMAND)
 
-    def list_directory_content(self, directory=''):
-        res = self.execute_command(command='ls ' + TestIntegration.TEST_DIRECTORY + '/' + directory + ' -lv')
+    def list_directory_content(self, directory='', absolute=False):
+        if absolute is True:
+            res = self.execute_command(command='ls ' + directory + ' -lv')
+        else:
+            res = self.execute_command(command='ls ' + TestIntegration.TEST_DIRECTORY + '/' + directory + ' -lv')
         files = []
         for elem in res.stdout.split('\n'):
             info = elem.strip().split()
-            if len(info) <= 2:
+            if len(info) <= 5 or (len(info) >= 1 and info[0] == 'ls:'):
                 # The first line is not interesting (with a "total" information)
+                # If there was a mount/umount problem you can also have: ls: cannot access mongofs-integration-test-0.653900736406249: Transport endpoint is not connected
                 continue
             attributes = info[0]
             owner = info[2]
@@ -60,6 +87,7 @@ class TestIntegration(unittest.TestCase):
             filename = info[-1]
             file = {'attributes':attributes,'owner':owner,'group':group,'size':size, 'filename':filename}
             files.append(file)
+
         return files
 
     def test_touch(self):
@@ -164,21 +192,25 @@ class TestIntegration(unittest.TestCase):
         res = self.execute_command(command='mv ' + TestIntegration.TEST_DIRECTORY + '/dir0 ' + TestIntegration.TEST_DIRECTORY + '/renamed-dir0')
         self.assertEqual(res.returncode, 0)
         files = self.list_directory_content()
+        print('List files in /: \n'+str(files))
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]['filename'], 'renamed-dir0')
         self.assertEqual(files[0]['attributes'][0], "d")
 
         files = self.list_directory_content(directory='renamed-dir0')
+        print('List files in renamed-dir0: \n'+str(files))
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]['filename'], 'dir1')
         self.assertEqual(files[0]['attributes'][0], "d")
 
         files = self.list_directory_content(directory='renamed-dir0/dir1')
+        print('\nList files in renamed-dir0/dir1: \n'+str(files))
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]['filename'], 'dir2')
         self.assertEqual(files[0]['attributes'][0], "d")
 
         files = self.list_directory_content(directory='renamed-dir0/dir1/dir2')
+        print('\nList files in renamed-dir0/dir1/dir2: \n'+str(files))
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]['filename'], 'hello')
         self.assertNotEqual(files[0]['attributes'][0], "d")

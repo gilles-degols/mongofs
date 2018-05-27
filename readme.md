@@ -79,3 +79,14 @@ python3.6 -m src.main /mnt/data
 python3.6 -m src.main /mnt/data conf/mongofs.json
 ```
 Important note: As this is still a project in development, the database is automatically cleaned each time you mount the file system. This option will be moved to the configuration file soon.
+
+4. Troubleshooting
+
+If there was a problem during the mount, the mounting directory might have some problems (impossible to delete it, re-use it, ...):
+```
+rmdir /mnt/data
+# rmdir: failed to remove ‘/mnt/att’: Device or resource busy
+# Note: the command below might not work directly / at first attempt. Feel free to retry it.
+fusermount -u /mnt/data
+rmdir /mnt/data
+```
