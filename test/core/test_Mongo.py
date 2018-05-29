@@ -23,11 +23,6 @@ class TestMongo(unittest.TestCase):
     def tearDown(self):
         self.obj.clean_database()
 
-    def test_connect(self):
-        # Normally the "setUp" should have already created a connection
-        self.obj.connect()
-        self.assertEqual(list(self.obj.files_coll.find({'_id':'0'})), [])
-
     def test_load_generic_file_file(self):
         self.assertIsInstance(self.obj.load_generic_file(self.utils.file_raw), File)
 
@@ -59,13 +54,13 @@ class TestMongo(unittest.TestCase):
 
     def test_create_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename},{'uploadDate':False})
+        gf = self.utils.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename},{'uploadDate':False})
         self.assertEqual(json_util.dumps(gf), json_util.dumps(self.utils.file_raw))
 
     def test_remove_generic_file(self):
         self.utils.insert_file()
         self.obj.remove_generic_file(generic_file=self.utils.file)
-        gf = self.obj.files_coll.find_one({'filename': self.utils.file.filename})
+        gf = self.utils.files_coll.find_one({'filename': self.utils.file.filename})
         self.assertEqual(gf, None)
 
     def test_remove_generic_file_directory_not_empty(self):
@@ -120,7 +115,7 @@ class TestMongo(unittest.TestCase):
     def test_add_nlink_directory(self):
         # By default, a directory has 2 st_nlink. And by default, the "/" directory always exists.
         self.obj.add_nlink_directory(directory_id=self.utils.root_id, value=4)
-        gf = self.obj.files_coll.find_one({'_id': self.utils.root_id})
+        gf = self.utils.files_coll.find_one({'_id': self.utils.root_id})
         self.assertEqual(gf['metadata']['st_nlink'], 6)
 
     def test_read_data(self):
@@ -196,10 +191,10 @@ class TestMongo(unittest.TestCase):
         # Normally, the chunks should not change at all, but we never know.
         self.assertEqual(destination_message, message)
 
-        old_file = self.obj.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':initial_filepath.split('/')[-1]})
+        old_file = self.utils.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':initial_filepath.split('/')[-1]})
         self.assertEqual(old_file, None)
 
-        new_file = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':'rename-test'})
+        new_file = self.utils.files_coll.find_one({'directory_id':self.utils.root_id,'filename':'rename-test'})
         self.assertNotEqual(new_file, None)
 
     def test_unlock_generic_file(self):
@@ -221,7 +216,7 @@ class TestMongo(unittest.TestCase):
     def test_basic_save(self):
         self.utils.insert_file()
         self.obj.basic_save(generic_file=self.utils.file, metadata={'st_nlink':1}, attrs={'thing':1})
-        result = self.obj.files_coll.find_one({'_id':self.utils.file._id})
+        result = self.utils.files_coll.find_one({'_id':self.utils.file._id})
         self.assertTrue('st_nlink' in result['metadata'] and len(result['metadata']) == 1)
         self.assertTrue('thing' in result['attrs'] and len(result['attrs']) == 1)
 

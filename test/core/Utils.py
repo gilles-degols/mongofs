@@ -10,6 +10,10 @@ class Utils:
             mongo = Mongo()
 
         self.mongo = mongo
+        self.database = self.mongo.cache.database
+        self.files_coll = self.database[self.mongo.files_coll]
+        self.chunks_coll = self.database[self.mongo.chunks_coll]
+
         self.file = None
         self.file_raw = None
         self.directory = None
@@ -27,8 +31,8 @@ class Utils:
             root_raw = json_util.loads(f.read())
             # Special case for the root directory: we want to keep the same object id and so on. So we will simply drop
             # the default document created for "/", and add the current one.
-            self.mongo.files_coll.delete_one({'directory_id':None,'filename':''})
-            self.mongo.files_coll.insert_one(root_raw)
+            self.files_coll.delete_one({'directory_id':None,'filename':''})
+            self.files_coll.insert_one(root_raw)
             self.root_id = root_raw['_id']
 
         with open('test/resources/data/file.json', 'r') as f:
@@ -55,22 +59,22 @@ class Utils:
         self.directory_file.filepath = self.directory.filepath+'/'+self.directory_file.filename
 
     def insert_file(self):
-        self.mongo.files_coll.insert_one(self.file_raw)
+        self.files_coll.insert_one(self.file_raw)
 
     def insert_file_chunks(self):
-        self.mongo.chunks_coll.insert_many(self.file_chunks_raw)
+        self.chunks_coll.insert_many(self.file_chunks_raw)
 
     def insert_directory(self):
-        self.mongo.files_coll.insert_one(self.directory_raw)
+        self.files_coll.insert_one(self.directory_raw)
 
     def insert_directory_file(self):
-        self.mongo.files_coll.insert_one(self.directory_file_raw)
+        self.files_coll.insert_one(self.directory_file_raw)
 
     def insert_symbolic_link(self):
-        self.mongo.files_coll.insert_one(self.symbolic_link_raw)
+        self.files_coll.insert_one(self.symbolic_link_raw)
 
     def read_file_chunks(self):
         message = b''
-        for chunk in self.mongo.chunks_coll.find({'files_id':self.file._id}):
+        for chunk in self.chunks_coll.find({'files_id':self.file._id}):
             message += chunk['data']
         return message

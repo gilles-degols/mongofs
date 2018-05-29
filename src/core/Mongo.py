@@ -5,18 +5,15 @@ from errno import ENOENT, EDEADLOCK
 import time
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
-from pymongo import MongoClient
-import gridfs
-from pymongo.collection import ReturnDocument
-
 from src.core.Configuration import Configuration
+from src.core.MongoCache import MongoCache
 from src.core.GenericFile import GenericFile
 from src.core.File import File
 from src.core.Directory import Directory
 from src.core.SymbolicLink import SymbolicLink
 
 class Mongo:
-    instance = None
+    cache = None
     configuration = None
 
     LOCKED_FILE = 1
@@ -24,31 +21,17 @@ class Mongo:
 
     def __init__(self):
         # We reuse the same connexion
-        if Mongo.instance is None:
-            Mongo.configuration = Configuration()
-            self.connect()
-        self.instance = Mongo.instance
-        self.database = Mongo.instance[Mongo.configuration.mongo_database()]
+        Mongo.configuration = Configuration()
+        Mongo.cache = MongoCache()
 
-        # We use gridfs only to store the files. Even if we have a lot of small files, the overhead should
-        # still be small.
-        # Documentation: https://api.mongodb.com/python/current/api/gridfs/index.html
-        self.gridfs_collection = Mongo.configuration.mongo_prefix() + 'files'
-        self.gridfs = gridfs.GridFS(self.database, self.gridfs_collection)
-
-        self.files_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.files']
-        self.chunks_coll =  self.database[Mongo.configuration.mongo_prefix() + 'files.chunks']
+        # Collection name
+        self.gridfs_coll = Mongo.configuration.mongo_prefix() + 'files'
+        self.files_coll =  Mongo.configuration.mongo_prefix() + 'files.files'
+        self.chunks_coll =  Mongo.configuration.mongo_prefix() + 'files.chunks'
 
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
         GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
-
-    """
-        Establish a connection to mongodb
-    """
-    def connect(self):
-        mongo_path = 'mongodb://' + ','.join(Mongo.configuration.mongo_hosts())
-        Mongo.instance = MongoClient(mongo_path)
 
     """
         Load the appropriate object for the given json. Should never return a GenericFile, but rather a child class.
@@ -101,8 +84,7 @@ class Mongo:
         Create a generic file in gridfs. No need to return it.
     """
     def create_generic_file(self, generic_file):
-        f = self.gridfs.new_file(**generic_file.json)
-        f.close()
+        Mongo.cache.gridfs_new_file(generic_file.json)
 
     """
         Remove a generic file. No need to verify if the file already exists, the check is done by FUSE.
@@ -111,11 +93,11 @@ class Mongo:
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
         # be sure the directory is empty.
         if generic_file.is_dir():
-            if self.files_coll.find({'directory_id':generic_file._id}).count() != 0:
+            if Mongo.cache.find(self.files_coll, {'directory_id':generic_file._id}).count() != 0:
                 raise FuseOSError(errno.ENOTEMPTY)
 
         # First we delete the file (metadata + chunks)
-        self.gridfs.delete(generic_file._id)
+        Mongo.cache.gridfs_delete(generic_file._id)
 
         # Then we decrease the number of link in the directory above it
         self.add_nlink_directory(directory_id=generic_file.directory_id, value=-1)
@@ -127,8 +109,7 @@ class Mongo:
     def list_generic_files_in_directory(self, filepath):
         dir = self.get_generic_file(filepath=filepath)
         files = []
-        print('Try to list files matching directory_id: '+str(dir._id))
-        for elem in self.files_coll.find({'directory_id':dir._id}, no_cursor_timeout=True):
+        for elem in Mongo.cache.find(self.files_coll, {'directory_id':dir._id}):
             files.append(Mongo.load_generic_file(elem))
         return files
 
@@ -189,12 +170,12 @@ class Mongo:
         current_process_lock = Mongo.lock_id(filepath=filepath)
         master_process_lock = Mongo.master_lock_id(filepath=filepath)
         if lock is not None:
-            gf = self.files_coll.find_one_and_update({'directory_id':directory_id,'filename': filename,'lock':{'$exists':False}},
-                                                     {'$set':{'lock':{'creation':dt,'id':lock}}},
-                                                    return_document=ReturnDocument.AFTER)
+            gf = Mongo.cache.find_one_and_update(self.files_coll,
+                                                 {'directory_id':directory_id,'filename': filename,'lock':{'$exists':False}},
+                                                 {'$set':{'lock':{'creation':dt,'id':lock}}})
             if gf is None:
                 # File might not exist, we don't know for sure.
-                gf = self.files_coll.find_one({'directory_id':directory_id,'filename': filename})
+                gf = Mongo.cache.find_one(self.files_coll, {'directory_id':directory_id,'filename': filename})
                 if gf is None:
                     return Mongo.FILE_NOT_FOUND
                 elif gf['lock']['creation'] >= dt_timeout:
@@ -202,8 +183,9 @@ class Mongo:
                     print('Lock for '+filename+' was created/updated '+str(diff)+'s ago. Maximum timeout is '+
                           str(Mongo.configuration.lock_timeout()+', so we remove the lock (if it was not taken by another '+
                           'process right now).'))
-                    self.files_coll.find_one_and_update({'directory_id':directory_id, 'filename': filename, 'lock.id':gf['lock']['id']},
-                                                          {'$unset':{'lock':''}}, return_document=ReturnDocument.AFTER)
+                    Mongo.cache.find_one_and_update(self.files_coll,
+                                                    {'directory_id':directory_id, 'filename': filename, 'lock.id':gf['lock']['id']},
+                                                    {'$unset':{'lock':''}})
                     return self.get_generic_file_internal(filename=filename, lock=lock)
                 elif gf['lock']['id'] == current_process_lock:
                     # It means it was the same that acquired the log, so he can have access to the file
@@ -213,7 +195,7 @@ class Mongo:
             return Mongo.load_generic_file(gf)
         else:
             # We don't really need to verify the lock directly in the MongoDB query, the logic will be outside MongoDB anyway
-            gf = self.files_coll.find_one({'directory_id':directory_id,'filename': filename})
+            gf = Mongo.cache.find_one(self.files_coll, {'directory_id':directory_id,'filename': filename})
             if gf is not None:
                 if 'lock' in gf and gf['lock']['id'] != current_process_lock and current_process_lock != master_process_lock:
                     return Mongo.LOCKED_FILE
@@ -238,7 +220,7 @@ class Mongo:
 
         # We should ideally check on the generic_file_type to be a DIR, not sure though are handled the symbolic link...
         # Did we receive directly the path correctly redirected? Or did we receive the path with the symbolic link in it? TODO: Verify it.
-        dir = self.files_coll.find_one({'directory_id':previous_directory_id,'filename':first_directory_name,'generic_file_type': GenericFile.DIRECTORY_TYPE})
+        dir = Mongo.cache.find_one(self.files_coll, {'directory_id':previous_directory_id,'filename':first_directory_name,'generic_file_type': GenericFile.DIRECTORY_TYPE})
         if dir is not None:
             return self.get_last_directory_id_for_filepath(filepath='/'.join(elems[1:]), previous_directory_id=dir['_id'])
 
@@ -249,8 +231,7 @@ class Mongo:
     """
     def add_nlink_directory(self, directory_id, value):
         # You cannot update directly the object from gridfs, you need to do a MongoDB query instead
-        self.files_coll.find_one_and_update({'_id':directory_id},
-                                                         {'$inc':{'metadata.st_nlink':value}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':directory_id}, {'$inc':{'metadata.st_nlink':value}})
 
 
     """
@@ -269,7 +250,7 @@ class Mongo:
         starting_offset = offset % chunk_size
         ending_size = chunk_size
         data = b''
-        for chunk in self.chunks_coll.find({'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
+        for chunk in Mongo.cache.find(self.chunks_coll, {'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
             if chunk['n'] == ending_chunk:
                 ending_size = size % chunk_size
             data += chunk['data'][starting_offset:ending_size]
@@ -296,9 +277,9 @@ class Mongo:
         starting_byte = offset - starting_chunk * chunk_size
         if starting_byte < 0:
             print('Computation error for offset: '+str(offset))
-        for chunk in self.chunks_coll.find({'files_id':file._id,'n':{'$gte':starting_chunk}}):
+        for chunk in Mongo.cache.find(self.chunks_coll, {'files_id':file._id,'n':{'$gte':starting_chunk}}):
             chunk['data'] = chunk['data'][0:starting_byte] + data[0:chunk_size-starting_byte]
-            self.chunks_coll.find_one_and_update({'_id':chunk['_id']},{'$set':{'data':chunk['data']}})
+            Mongo.cache.find_one_and_update(self.chunks_coll, {'_id':chunk['_id']},{'$set':{'data':chunk['data']}})
 
             # We have written a part of what we wanted, we only need to keep the remaining
             data = data[chunk_size-starting_byte:]
@@ -319,7 +300,7 @@ class Mongo:
                     "data": data[0:chunk_size],
                     "n": total_chunks
                 }
-                self.chunks_coll.insert_one(chunk)
+                Mongo.cache.insert_one(self.chunks_coll, chunk)
 
                 # We have written a part of what we wanted, we only the keep the remaining
                 data = data[chunk_size:]
@@ -328,7 +309,7 @@ class Mongo:
                 total_chunks += 1
 
         # We update the total length and that's it
-        self.files_coll.find_one_and_update({'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
 
         return True
 
@@ -341,16 +322,16 @@ class Mongo:
         # We drop every unnecessary chunk
         chunk_size = file.chunkSize
         maximum_chunks = int(ceil(length / chunk_size))
-        self.chunks_coll.delete_many({'files_id':file._id,'n':{'$gte':maximum_chunks}})
+        Mongo.cache.delete_many(self.chunks_coll, {'files_id':file._id,'n':{'$gte':maximum_chunks}})
 
         # We update the last chunk
         if length % chunk_size != 0:
-            last_chunk = self.chunks_coll.find_one({'files_id':file._id,'n':maximum_chunks-1})
+            last_chunk = Mongo.cache.find_one(self.chunks_coll, {'files_id':file._id,'n':maximum_chunks-1})
             last_chunk['data'] = last_chunk['data'][0:length % chunk_size]
-            self.chunks_coll.find_one_and_update({'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
+            Mongo.cache.find_one_and_update(self.chunks_coll, {'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
 
         # We update the total length and that's it
-        self.files_coll.find_one_and_update({'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
         return True
 
     """
@@ -370,7 +351,7 @@ class Mongo:
         # We rename it
         destination_directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
         dest_filename = destination_filepath.split('/')[-1]
-        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'directory_id':destination_directory_id,'filename':dest_filename}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':generic_file._id},{'$set':{'directory_id':destination_directory_id,'filename':dest_filename}})
 
         # We increase the number of nlink in the final directory
         self.add_nlink_directory(directory_id=destination_directory_id, value=-1)
@@ -388,22 +369,21 @@ class Mongo:
         # For now, if we have a master-lock, we need to remove any lock. In that case, we should still verify that the lock
         # is released by the appropriate host (TODO).
         if lock_id == master_lock_id:
-            self.files_coll.find_one_and_update({'_id': generic_file._id},
-                                                {'$unset': {'lock': ''}}, return_document=ReturnDocument.AFTER)
+            Mongo.cache.find_one_and_update(self.files_coll,{'_id': generic_file._id}, {'$unset': {'lock': ''}})
         else:
-            self.files_coll.find_one_and_update({'_id': generic_file._id, 'lock.id': lock_id},
-                                                {'$unset': {'lock': ''}}, return_document=ReturnDocument.AFTER)
+            Mongo.cache.find_one_and_update(self.files_coll, {'_id': generic_file._id, 'lock.id': lock_id},
+                                                {'$unset': {'lock': ''}})
         return True
 
     """
         Update some arbitrary fields in the general "files" object
     """
     def basic_save(self, generic_file, metadata, attrs):
-        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'metadata':metadata,'attrs':attrs}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':generic_file._id},{'$set':{'metadata':metadata,'attrs':attrs}})
 
     """
         Clean the database, only for development purposes
     """
     def clean_database(self):
-        self.chunks_coll.drop()
-        self.files_coll.drop()
+        Mongo.cache.drop(self.chunks_coll)
+        Mongo.cache.drop(self.files_coll)

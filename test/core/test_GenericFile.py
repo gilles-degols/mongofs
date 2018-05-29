@@ -26,11 +26,11 @@ class TestGenericFile(unittest.TestCase):
 
     def test_basic_save(self):
         self.utils.insert_file()
-        initial_gf = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id,'filename':self.utils.file.filename},{'uploadDate':False})
+        initial_gf = self.utils.files_coll.find_one({'directory_id':self.utils.root_id,'filename':self.utils.file.filename},{'uploadDate':False})
 
         self.utils.file.metadata['st_nlink'] = 37
         self.utils.file.basic_save()
-        modified_gf = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id,'filename': self.utils.file.filename}, {'uploadDate': False})
+        modified_gf = self.utils.files_coll.find_one({'directory_id':self.utils.root_id,'filename': self.utils.file.filename}, {'uploadDate': False})
 
         self.assertEqual(modified_gf['metadata']['st_nlink'], 37)
 
@@ -41,10 +41,10 @@ class TestGenericFile(unittest.TestCase):
         self.utils.insert_file()
         initial_filename = self.utils.file.filename
         self.utils.file.rename_to(initial_filepath=self.utils.file.filepath, destination_filepath='/rename-file')
-        old_file = self.mongo.files_coll.find_one({'directory_id':self.utils.file.directory_id, 'filename': initial_filename})
+        old_file = self.utils.files_coll.find_one({'directory_id':self.utils.file.directory_id, 'filename': initial_filename})
         self.assertEqual(old_file, None)
 
-        new_file = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id, 'filename': 'rename-file'})
+        new_file = self.utils.files_coll.find_one({'directory_id':self.utils.root_id, 'filename': 'rename-file'})
         self.assertNotEqual(new_file, None)
 
     def test_unlock(self):
@@ -59,7 +59,7 @@ class TestGenericFile(unittest.TestCase):
     def test_new_generic_file_file(self):
         # Creation of a basic file
         GenericFile.new_generic_file(filepath=self.utils.file.filepath, mode=0o755, file_type=GenericFile.FILE_TYPE)
-        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename})
+        inserted_file = self.utils.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename})
         self.assertEqual(inserted_file['filename'], self.utils.file.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFREG | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.FILE_TYPE)
@@ -67,7 +67,7 @@ class TestGenericFile(unittest.TestCase):
     def test_new_generic_file_directory(self):
         # Creation of a directory
         GenericFile.new_generic_file(filepath=self.utils.directory.filepath, mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
-        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.directory.directory_id,'filename':self.utils.directory.filename})
+        inserted_file = self.utils.files_coll.find_one({'directory_id':self.utils.directory.directory_id,'filename':self.utils.directory.filename})
         self.assertEqual(inserted_file['filename'], self.utils.directory.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFDIR | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.DIRECTORY_TYPE)
@@ -77,7 +77,7 @@ class TestGenericFile(unittest.TestCase):
         self.utils.insert_file()
 
         GenericFile.new_generic_file(filepath=self.utils.symbolic_link.filepath, mode=0o755, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=self.utils.file.filename)
-        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.symbolic_link.directory_id,'filename':self.utils.symbolic_link.filename})
+        inserted_file = self.utils.files_coll.find_one({'directory_id':self.utils.symbolic_link.directory_id,'filename':self.utils.symbolic_link.filename})
         self.assertEqual(inserted_file['filename'], self.utils.symbolic_link.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFLNK | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.SYMBOLIC_LINK_TYPE)
