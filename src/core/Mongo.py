@@ -41,7 +41,7 @@ class Mongo:
 
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
-        GenericFile.new_generic_file(filename='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+        GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
 
     """
         Establish a connection to mongodb
@@ -80,8 +80,8 @@ class Mongo:
             hostname            
     """
     @staticmethod
-    def lock_id(filename):
-        lock_id = filename + ';' + str(Mongo.current_user()['pid']) + ';' + str(Mongo.configuration.hostname())
+    def lock_id(filepath):
+        lock_id = filepath + ';' + str(Mongo.current_user()['pid']) + ';' + str(Mongo.configuration.hostname())
         return lock_id
 
     """
@@ -93,8 +93,8 @@ class Mongo:
         PID 0, and we need to fulfill it anyway
     """
     @staticmethod
-    def master_lock_id(filename):
-        lock_id = filename + ';' + str(0) + ';' + str(Mongo.configuration.hostname())
+    def master_lock_id(filepath):
+        lock_id = filepath + ';' + str(0) + ';' + str(Mongo.configuration.hostname())
         return lock_id
 
     """
@@ -111,30 +111,32 @@ class Mongo:
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
         # be sure the directory is empty.
         if generic_file.is_dir():
-            if self.files_coll.find({'directory':generic_file.filename}).count() != 0:
+            if self.files_coll.find({'directory_id':generic_file._id}).count() != 0:
                 raise FuseOSError(errno.ENOTEMPTY)
 
         # First we delete the file (metadata + chunks)
         self.gridfs.delete(generic_file._id)
 
         # Then we decrease the number of link in the directory above it
-        directory = GenericFile.get_directory(filename=generic_file.filename)
-        self.add_nlink_directory(directory=directory, value=-1)
+        self.add_nlink_directory(directory_id=generic_file.directory_id, value=-1)
 
     """
         List files in a given directory. 
+        TODO: Change the method signature maybe?
     """
-    def list_generic_files_in_directory(self, directory):
+    def list_generic_files_in_directory(self, filepath):
+        dir = self.get_generic_file(filepath=filepath)
         files = []
-        for elem in self.files_coll.find({'directory':directory}, no_cursor_timeout=True):
+        print('Try to list files matching directory_id: '+str(dir._id))
+        for elem in self.files_coll.find({'directory_id':dir._id}, no_cursor_timeout=True):
             files.append(Mongo.load_generic_file(elem))
         return files
 
     """
         Indicate if the generic file exists or not. 
     """
-    def generic_file_exists(self, filename):
-        return self.get_generic_file(filename=filename) is not None
+    def generic_file_exists(self, filepath):
+        return self.get_generic_file(filepath=filepath) is not None
 
     """
         Wrapper around get_generic_file_internal() in charge of waiting x seconds before throwing a "LOCKED_FILE" exception 
@@ -144,18 +146,20 @@ class Mongo:
          Throw an error if there is lock
          None if the file is not found
     """
-    def get_generic_file(self, filename, take_lock=False):
+    def get_generic_file(self, filepath, take_lock=False):
         dt = time.time()
         lock_max_access = Mongo.configuration.lock_access_attempt()
         gf = Mongo.LOCKED_FILE
 
         if take_lock is True:
-            lock_id = Mongo.lock_id(filename=filename)
+            lock_id = Mongo.lock_id(filepath=filepath)
         else:
             lock_id = None
 
+        directory_id = self.get_last_directory_id_for_filepath(filepath=filepath)
+        filename = filepath.split('/')[-1]
         while gf == Mongo.LOCKED_FILE and dt + lock_max_access >= time.time():
-            gf = self.get_generic_file_internal(filename=filename, lock=lock_id)
+            gf = self.get_generic_file_internal(filepath=filepath, directory_id=directory_id, filename=filename, lock=lock_id)
             if gf == Mongo.LOCKED_FILE:
                 # Wait 1s before checking the lock again
                 time.sleep(1)
@@ -170,26 +174,27 @@ class Mongo:
     """
         Retrieve any file / directory / link document from Mongo. 
         If "lock" contains a lock id (versus None), we only return the generic file if we were able to put the lock on it directly.
+        We do not analyze the intermediate locks (in the directories) as this will be done by FUSE directly.
         Be careful: If one process did not put a lock, and another wants to add it, it will be able to do it obviously.
         Returns 
          GenericFile instance (child of that class in fact)
          Mongo.LOCKED_FILE if the file is currently locked (we tried to access it multiple times during a short amount of time before returning that information)
          Mongo.FILE_NOT_FOUND None if none are found.
     """
-    def get_generic_file_internal(self, filename, lock=None):
+    def get_generic_file_internal(self, filepath, directory_id, filename, lock=None):
         dt = time.time()
         dt_timeout = dt + Mongo.configuration.lock_timeout()
 
         # The same process could be the one having created the lock, so we need to let him have access to the file
-        current_process_lock = Mongo.lock_id(filename=filename)
-        master_process_lock = Mongo.master_lock_id(filename=filename)
+        current_process_lock = Mongo.lock_id(filepath=filepath)
+        master_process_lock = Mongo.master_lock_id(filepath=filepath)
         if lock is not None:
-            gf = self.files_coll.find_one_and_update({'filename': filename,'lock':{'$exists':False}},
+            gf = self.files_coll.find_one_and_update({'directory_id':directory_id,'filename': filename,'lock':{'$exists':False}},
                                                      {'$set':{'lock':{'creation':dt,'id':lock}}},
                                                     return_document=ReturnDocument.AFTER)
             if gf is None:
                 # File might not exist, we don't know for sure.
-                gf = self.files_coll.find_one({'filename': filename})
+                gf = self.files_coll.find_one({'directory_id':directory_id,'filename': filename})
                 if gf is None:
                     return Mongo.FILE_NOT_FOUND
                 elif gf['lock']['creation'] >= dt_timeout:
@@ -197,7 +202,7 @@ class Mongo:
                     print('Lock for '+filename+' was created/updated '+str(diff)+'s ago. Maximum timeout is '+
                           str(Mongo.configuration.lock_timeout()+', so we remove the lock (if it was not taken by another '+
                           'process right now).'))
-                    self.files_coll.find_one_and_update({'filename': filename, 'lock.id':gf['lock']['id']},
+                    self.files_coll.find_one_and_update({'directory_id':directory_id, 'filename': filename, 'lock.id':gf['lock']['id']},
                                                           {'$unset':{'lock':''}}, return_document=ReturnDocument.AFTER)
                     return self.get_generic_file_internal(filename=filename, lock=lock)
                 elif gf['lock']['id'] == current_process_lock:
@@ -208,7 +213,7 @@ class Mongo:
             return Mongo.load_generic_file(gf)
         else:
             # We don't really need to verify the lock directly in the MongoDB query, the logic will be outside MongoDB anyway
-            gf = self.files_coll.find_one({'filename': filename})
+            gf = self.files_coll.find_one({'directory_id':directory_id,'filename': filename})
             if gf is not None:
                 if 'lock' in gf and gf['lock']['id'] != current_process_lock and current_process_lock != master_process_lock:
                     return Mongo.LOCKED_FILE
@@ -217,11 +222,35 @@ class Mongo:
             return Mongo.FILE_NOT_FOUND
 
     """
+        Return the last directory_id for a given filepath. Return None if none are found.
+    """
+    def get_last_directory_id_for_filepath(self, filepath, previous_directory_id=None):
+        print('Get last directory id: '+str(filepath)+', level: '+str(previous_directory_id))
+        if filepath == '/': # Exception for '/' path as it generates a ['',''] list.
+            elems = ['']
+        else:
+            elems = filepath.split('/')
+
+        first_directory_name = elems[0]
+        if len(elems) == 1:
+            # We are at the last iteration, so in reality we would be testing the filename itself (not the goal),
+            # we can directly return the directory_id
+            return previous_directory_id
+
+        # We should ideally check on the generic_file_type to be a DIR, not sure though are handled the symbolic link...
+        # Did we receive directly the path correctly redirected? Or did we receive the path with the symbolic link in it? TODO: Verify it.
+        dir = self.files_coll.find_one({'directory_id':previous_directory_id,'filename':first_directory_name,'generic_file_type': GenericFile.DIRECTORY_TYPE})
+        if dir is not None:
+            return self.get_last_directory_id_for_filepath(filepath='/'.join(elems[1:]), previous_directory_id=dir['_id'])
+
+        return None
+
+    """
         Increment/reduce the number of links for a directory 
     """
-    def add_nlink_directory(self, directory, value):
+    def add_nlink_directory(self, directory_id, value):
         # You cannot update directly the object from gridfs, you need to do a MongoDB query instead
-        self.files_coll.find_one_and_update({'filename':directory},
+        self.files_coll.find_one_and_update({'_id':directory_id},
                                                          {'$inc':{'metadata.st_nlink':value}})
 
 
@@ -349,9 +378,9 @@ class Mongo:
     """
         Remove a lock to a generic file (only if we are owner of it). We do not care about the lock type. 
     """
-    def unlock_generic_file(self, generic_file):
-        lock_id = Mongo.lock_id(filename=generic_file.filename)
-        master_lock_id = Mongo.master_lock_id(filename=generic_file.filename)
+    def unlock_generic_file(self, filepath, generic_file):
+        lock_id = Mongo.lock_id(filepath=filepath)
+        master_lock_id = Mongo.master_lock_id(filepath=filepath)
         if 'id' not in generic_file.lock or lock_id not in [master_lock_id, generic_file.lock['id']]:
             print('Trying to release a non-existing lock, or one that we do not own. We do nothing.')
             return True

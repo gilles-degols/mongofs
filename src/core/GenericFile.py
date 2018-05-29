@@ -43,7 +43,7 @@ class GenericFile:
         self._id = json.get('_id', None)
         self.filename = json['filename']
         self.chunkSize = json.get('chunkSize', None)
-        self.directory = json['directory']
+        self.directory_id = json['directory_id']
         self.generic_file_type = json['generic_file_type']
         self.metadata = json['metadata']
         self.attrs = json.get('attrs',{})
@@ -78,37 +78,40 @@ class GenericFile:
         return False
 
     """
-        Rename a generic file to another filename
+        Rename a generic file to another filepath
     """
-    def rename_to(self, filename):
-        GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filename=filename)
-        self.filename = filename
+    def rename_to(self, filepath):
+        GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filepath=filepath)
+        # We update the related filename and directory
+        self.filename = filepath.split('/')[-1]
+        self.directory_id = GenericFile.get_directory_id(filepath=filepath)
 
     """
         Try to release a lock on a generic file. The lock is initially generated when we try to load the file, so there
         is no method here for the opposite management of lock. 
     """
-    def unlock(self):
-        return GenericFile.mongo.unlock_generic_file(generic_file=self)
+    def unlock(self, filepath):
+        return GenericFile.mongo.unlock_generic_file(filepath=filepath, generic_file=self)
 
     """
         Return an instance of a file / directory when we want to create a new one
     """
     @staticmethod
-    def new_generic_file(filename, mode, file_type, target=None):
-        directory = GenericFile.get_directory(filename=filename)
+    def new_generic_file(filepath, mode, file_type, target=None):
+        directory_id = GenericFile.get_directory_id(filepath=filepath)
 
-        if not GenericFile.is_generic_filename_available(filename=filename):
-            print('GenericFile not available for '+filename+', we do nothing.')
+        if not GenericFile.is_generic_filepath_available(filepath=filepath):
+            print('GenericFile not available for '+filepath+', we do nothing.')
             return None
 
-        if filename != '/':
-            GenericFile.mongo.add_nlink_directory(directory=directory, value=1)
+        if filepath != '/':
+            GenericFile.mongo.add_nlink_directory(directory_id=directory_id, value=1)
 
         # Basic structure of the document to create in MongoDB
+        filename = filepath.split('/')[-1]
         dt = time.time()
         struct = {
-            'directory': directory,
+            'directory_id': directory_id,
             'filename': filename,
             'generic_file_type': file_type,
             'metadata': {
@@ -145,41 +148,53 @@ class GenericFile:
         return f
 
     """
-        Compute the directory for the given filename. Return a String only.
+        Compute the directory for the given filepath. Return a String only.
         For the "/" filename, it will return ""
     """
     @staticmethod
-    def get_directory(filename):
+    def get_directory_name(filepath):
         # Format the path
-        if filename == '/':
+        if filepath == '/':
             return ''
 
-        if filename != '/' and filename.endswith('/'):
+        if filepath != '/' and filepath.endswith('/'):
             print('A directory or a file cannot finish with a /.')
             return None
 
-        directory = '/'.join(filename.split('/')[:-1])
+        directory = '/'.join(filepath.split('/')[:-1])
         if not directory.startswith('/'):
             directory = '/' + directory
 
         return directory
 
     """
+        Get the directory _id for the given filepath. Return a {$oid: "...."}.
+        For the "/" filename, it will return None
+    """
+    @staticmethod
+    def get_directory_id(filepath):
+        directory = GenericFile.get_directory_name(filepath=filepath)
+        dir = GenericFile.mongo.get_generic_file(filepath=directory)
+        if dir is None:
+            return None
+        return dir._id
+
+    """
         Check if we can create a generic file for the given path
     """
     @staticmethod
-    def is_generic_filename_available(filename):
+    def is_generic_filepath_available(filepath):
         # We try to look for the directory directly above it (only one layer above), as we need to increase the "st_nlink" value.
-        directory = GenericFile.get_directory(filename=filename)
-        if filename != '/' and not GenericFile.mongo.generic_file_exists(filename=directory):
+        directory_name = GenericFile.get_directory_name(filepath=filepath)
+        if filepath != '/' and not GenericFile.mongo.generic_file_exists(filepath=directory_name):
             # There is no need to verify if this level above the current file is a directory or not, it will be automatically
             # checked by FUSE with readdir()
-            print('Missing intermediate directory "'+directory+'" for file "'+filename+'".')
+            print('Missing intermediate directory "'+directory_name+'" for file "'+filepath+'".')
             return True
 
         # Now we need to verify there is no similar file already existing
-        if GenericFile.mongo.get_generic_file(filename=filename) is not None:
-            print('A file already exists with the path "' + filename + '".')
+        if GenericFile.mongo.get_generic_file(filepath=filepath) is not None:
+            print('A file already exists with the path "' + filepath + '".')
             return False
 
         return True
