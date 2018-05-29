@@ -27,9 +27,10 @@ Features development:
 - [x] Set access / update time of a directory / file / symbolic link
 - [x] Handle rename of files / directories / links
 - [x] File Lock - Experimental (based on the PID)
-- [ ] Unit testing - Work in progress
-- [ ] Performance improvement (caching, indexes, ...)
+- [x] Unit testing
+- [x] Integration test
 - [ ] Scalability test
+- [ ] Performance improvement (caching, indexes, ...)
 - [ ] Handling unreachable MongoDB instance
 - [ ] First stable release
 

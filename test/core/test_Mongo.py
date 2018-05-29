@@ -59,7 +59,7 @@ class TestMongo(unittest.TestCase):
 
     def test_create_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':self.utils.file.filename},{'uploadDate':False})
+        gf = self.obj.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename},{'uploadDate':False})
         self.assertEqual(json_util.dumps(gf), json_util.dumps(self.utils.file_raw))
 
     def test_remove_generic_file(self):
@@ -196,7 +196,7 @@ class TestMongo(unittest.TestCase):
         # Normally, the chunks should not change at all, but we never know.
         self.assertEqual(destination_message, message)
 
-        old_file = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':initial_filepath.split('/')[-1]})
+        old_file = self.obj.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':initial_filepath.split('/')[-1]})
         self.assertEqual(old_file, None)
 
         new_file = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':'rename-test'})

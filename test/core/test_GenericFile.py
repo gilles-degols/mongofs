@@ -26,11 +26,11 @@ class TestGenericFile(unittest.TestCase):
 
     def test_basic_save(self):
         self.utils.insert_file()
-        initial_gf = self.mongo.files_coll.find_one({'filename':self.utils.file.filename},{'uploadDate':False})
+        initial_gf = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id,'filename':self.utils.file.filename},{'uploadDate':False})
 
         self.utils.file.metadata['st_nlink'] = 37
         self.utils.file.basic_save()
-        modified_gf = self.mongo.files_coll.find_one({'filename': self.utils.file.filename}, {'uploadDate': False})
+        modified_gf = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id,'filename': self.utils.file.filename}, {'uploadDate': False})
 
         self.assertEqual(modified_gf['metadata']['st_nlink'], 37)
 
@@ -40,34 +40,34 @@ class TestGenericFile(unittest.TestCase):
     def test_rename_to(self):
         self.utils.insert_file()
         initial_filename = self.utils.file.filename
-        self.utils.file.rename_to(filename='rename-file')
-        old_file = self.mongo.files_coll.find_one({'filename': initial_filename})
+        self.utils.file.rename_to(initial_filepath=self.utils.file.filepath, destination_filepath='/rename-file')
+        old_file = self.mongo.files_coll.find_one({'directory_id':self.utils.file.directory_id, 'filename': initial_filename})
         self.assertEqual(old_file, None)
 
-        new_file = self.mongo.files_coll.find_one({'filename': 'rename-file'})
+        new_file = self.mongo.files_coll.find_one({'directory_id':self.utils.root_id, 'filename': 'rename-file'})
         self.assertNotEqual(new_file, None)
 
     def test_unlock(self):
         self.utils.insert_file()
-        gf = self.mongo.get_generic_file(filename=self.utils.file.filename, take_lock=True)
+        gf = self.mongo.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
         self.assertTrue('lock' in gf.json)
-        gf.unlock()
+        gf.unlock(filepath=self.utils.file.filepath)
 
-        gf = self.mongo.get_generic_file(filename=self.utils.file.filename)
+        gf = self.mongo.get_generic_file(filepath=self.utils.file.filepath)
         self.assertTrue('lock' not in gf.json)
 
     def test_new_generic_file_file(self):
         # Creation of a basic file
-        GenericFile.new_generic_file(filename=self.utils.file.filename, mode=0o755, file_type=GenericFile.FILE_TYPE)
-        inserted_file = self.mongo.files_coll.find_one({'filename':self.utils.file.filename})
+        GenericFile.new_generic_file(filepath=self.utils.file.filepath, mode=0o755, file_type=GenericFile.FILE_TYPE)
+        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename})
         self.assertEqual(inserted_file['filename'], self.utils.file.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFREG | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.FILE_TYPE)
 
     def test_new_generic_file_directory(self):
         # Creation of a directory
-        GenericFile.new_generic_file(filename=self.utils.directory.filename, mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
-        inserted_file = self.mongo.files_coll.find_one({'filename':self.utils.directory.filename})
+        GenericFile.new_generic_file(filepath=self.utils.directory.filepath, mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.directory.directory_id,'filename':self.utils.directory.filename})
         self.assertEqual(inserted_file['filename'], self.utils.directory.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFDIR | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.DIRECTORY_TYPE)
@@ -76,26 +76,27 @@ class TestGenericFile(unittest.TestCase):
         # Creation of a symbolic link to the initial self.utils.file just below
         self.utils.insert_file()
 
-        GenericFile.new_generic_file(filename=self.utils.symbolic_link.filename, mode=0o755, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=self.utils.file.filename)
-        inserted_file = self.mongo.files_coll.find_one({'filename':self.utils.symbolic_link.filename})
+        GenericFile.new_generic_file(filepath=self.utils.symbolic_link.filepath, mode=0o755, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=self.utils.file.filename)
+        inserted_file = self.mongo.files_coll.find_one({'directory_id':self.utils.symbolic_link.directory_id,'filename':self.utils.symbolic_link.filename})
         self.assertEqual(inserted_file['filename'], self.utils.symbolic_link.filename)
         self.assertEqual(inserted_file['metadata']['st_mode'], (S_IFLNK | 0o755))
         self.assertEqual(inserted_file['generic_file_type'], GenericFile.SYMBOLIC_LINK_TYPE)
         self.assertEqual(inserted_file['target'], self.utils.file.filename)
 
-    def test_get_directory(self):
+    def test_get_directory_id(self):
         self.utils.insert_directory()
+        self.utils.insert_directory_file()
 
-        directory_name = GenericFile.get_directory(filename=self.utils.directory.filename)
-        self.assertEqual(directory_name, "/")
+        directory_id = GenericFile.get_directory_id(filepath=self.utils.directory_file.filepath)
+        self.assertEqual(directory_id, self.utils.directory_file.directory_id)
 
     def test_is_generic_filename_available(self):
         self.utils.insert_file()
 
-        is_available = GenericFile.is_generic_filename_available(filename=self.utils.file.filename)
+        is_available = GenericFile.is_generic_filepath_available(filepath=self.utils.file.filepath)
         self.assertFalse(is_available)
 
-        is_available = GenericFile.is_generic_filename_available(filename=self.utils.file.filename+'.something')
+        is_available = GenericFile.is_generic_filepath_available(filepath=self.utils.file.filepath+'.something')
         self.assertTrue(is_available)
 
         # There is no need to verify if a filename is available inside a non-existing directory , it will be automatically

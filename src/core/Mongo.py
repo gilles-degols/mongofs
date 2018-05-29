@@ -225,7 +225,6 @@ class Mongo:
         Return the last directory_id for a given filepath. Return None if none are found.
     """
     def get_last_directory_id_for_filepath(self, filepath, previous_directory_id=None):
-        print('Get last directory id: '+str(filepath)+', level: '+str(previous_directory_id))
         if filepath == '/': # Exception for '/' path as it generates a ['',''] list.
             elems = ['']
         else:

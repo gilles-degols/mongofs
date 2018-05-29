@@ -52,7 +52,7 @@ class Utils:
         with open('test/resources/data/directory-file.json', 'r') as f:
             self.directory_file_raw = json_util.loads(f.read())
         self.directory_file = self.mongo.load_generic_file(self.directory_file_raw)
-        self.directory_file.filepath = self.directory.filepath+self.directory_file.filename
+        self.directory_file.filepath = self.directory.filepath+'/'+self.directory_file.filename
 
     def insert_file(self):
         self.mongo.files_coll.insert_one(self.file_raw)
