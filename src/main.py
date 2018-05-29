@@ -71,7 +71,7 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def rename(self, old, new):
         generic_file = self.mongo.get_generic_file(filepath=old)
-        generic_file.rename_to(filepath=new)
+        generic_file.rename_to(initial_filepath=old, destination_filepath=new)
 
     """
         Create a symbolic link to a generic file (source -> target). No need to return a file descriptor.

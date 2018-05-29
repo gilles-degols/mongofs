@@ -80,11 +80,11 @@ class GenericFile:
     """
         Rename a generic file to another filepath
     """
-    def rename_to(self, filepath):
-        GenericFile.mongo.rename_generic_file_to(generic_file=self, destination_filepath=filepath)
+    def rename_to(self, initial_filepath, destination_filepath):
+        GenericFile.mongo.rename_generic_file_to(generic_file=self, initial_filepath=initial_filepath, destination_filepath=destination_filepath)
         # We update the related filename and directory
-        self.filename = filepath.split('/')[-1]
-        self.directory_id = GenericFile.get_directory_id(filepath=filepath)
+        self.filename = destination_filepath.split('/')[-1]
+        self.directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
 
     """
         Try to release a lock on a generic file. The lock is initially generated when we try to load the file, so there

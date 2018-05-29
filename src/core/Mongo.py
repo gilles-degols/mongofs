@@ -359,21 +359,22 @@ class Mongo:
          generic_file: Instance of a GenericFile type object
          destination_filename: Expected filename
     """
-    def rename_generic_file_to(self, generic_file, destination_filename):
+    def rename_generic_file_to(self, generic_file, initial_filepath, destination_filepath):
         # There is no need to verify if the destination directory exists, and if there is not already a file with the same name,
         # as FUSE will automatically verify those conditions before calling our implementation of file moving.
 
         # First we decrease the number of nlink in the directory above (even if we might stay in the same repository
         # at the end, that's not a big deal)
-        directory = GenericFile.get_directory(filename=generic_file.filename)
-        self.add_nlink_directory(directory=directory, value=-1)
+        initial_directory_id = GenericFile.get_directory_id(filepath=initial_filepath)
+        self.add_nlink_directory(directory_id=initial_directory_id, value=-1)
 
         # We rename it
-        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'filename':destination_filename}})
+        destination_directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
+        dest_filename = destination_filepath.split('/')[-1]
+        self.files_coll.find_one_and_update({'_id':generic_file._id},{'$set':{'directory_id':destination_directory_id,'filename':dest_filename}})
 
         # We increase the number of nlink in the final directory
-        directory = GenericFile.get_directory(filename=destination_filename)
-        self.add_nlink_directory(directory=directory, value=-1)
+        self.add_nlink_directory(directory_id=destination_directory_id, value=-1)
 
     """
         Remove a lock to a generic file (only if we are owner of it). We do not care about the lock type. 
