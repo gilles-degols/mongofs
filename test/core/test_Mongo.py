@@ -44,22 +44,22 @@ class TestMongo(unittest.TestCase):
         self.assertIsInstance(user['pid'], int)
 
     def test_lock_id(self):
-        filename = 'test-file'
+        filepath = 'test-file'
         hostname = Mongo.configuration.hostname()
         pid = self.obj.current_user()['pid']
-        expected_lock = filename+';'+str(pid)+';'+hostname
-        self.assertEqual(self.obj.lock_id(filename=filename), expected_lock)
+        expected_lock = filepath+';'+str(pid)+';'+hostname
+        self.assertEqual(self.obj.lock_id(filepath=filepath), expected_lock)
 
     def test_master_lock_id(self):
-        filename = 'test-file'
+        filepath = 'test-file'
         hostname = Mongo.configuration.hostname()
         pid = 0
-        expected_lock = filename + ';' + str(pid) + ';' + hostname
-        self.assertEqual(self.obj.master_lock_id(filename=filename), expected_lock)
+        expected_lock = filepath + ';' + str(pid) + ';' + hostname
+        self.assertEqual(self.obj.master_lock_id(filepath=filepath), expected_lock)
 
     def test_create_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.files_coll.find_one({'filename':self.utils.file.filename},{'uploadDate':False})
+        gf = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':self.utils.file.filename},{'uploadDate':False})
         self.assertEqual(json_util.dumps(gf), json_util.dumps(self.utils.file_raw))
 
     def test_remove_generic_file(self):
@@ -91,36 +91,36 @@ class TestMongo(unittest.TestCase):
         self.utils.insert_file()
         self.utils.insert_symbolic_link()
 
-        files = self.obj.list_generic_files_in_directory(directory='/')
+        files = self.obj.list_generic_files_in_directory(filepath='/')
         self.assertEqual(len(files), 3)
 
     def test_generic_file_exists(self):
-        self.assertFalse(self.obj.generic_file_exists(self.utils.file.filename))
+        self.assertFalse(self.obj.generic_file_exists(self.utils.file.filepath))
         self.utils.insert_file()
-        self.assertTrue(self.obj.generic_file_exists(self.utils.file.filename))
+        self.assertTrue(self.obj.generic_file_exists(self.utils.file.filepath))
 
     def test_get_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
         self.assertIsInstance(gf, File)
 
     def test_get_generic_file_take_lock(self):
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename, take_lock=True)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
         self.assertIsInstance(gf, File)
 
         # We are the same owner, so normally, we should still be able to take the file if there is a lock on it.
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename, take_lock=True)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
         self.assertIsInstance(gf, File)
 
     def test_get_generic_file_missing(self):
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
         self.assertEqual(gf, None)
 
     def test_add_nlink_directory(self):
         # By default, a directory has 2 st_nlink. And by default, the "/" directory always exists.
-        self.obj.add_nlink_directory(directory='/', value=4)
-        gf = self.obj.files_coll.find_one({'filename':'/'})
+        self.obj.add_nlink_directory(directory_id=self.utils.root_id, value=4)
+        gf = self.obj.files_coll.find_one({'_id': self.utils.root_id})
         self.assertEqual(gf['metadata']['st_nlink'], 6)
 
     def test_read_data(self):
@@ -190,37 +190,38 @@ class TestMongo(unittest.TestCase):
         self.utils.insert_file_chunks()
         message = self.utils.read_file_chunks()
 
-        self.obj.rename_generic_file_to(generic_file=self.utils.file, destination_filename='rename-test')
+        initial_filepath = self.utils.file.filepath
+        self.obj.rename_generic_file_to(generic_file=self.utils.file, initial_filepath=self.utils.file.filepath, destination_filepath='/rename-test')
         destination_message = self.utils.read_file_chunks() # Read chunks is based on the _id, so we can call it
         # Normally, the chunks should not change at all, but we never know.
         self.assertEqual(destination_message, message)
 
-        old_file = self.obj.files_coll.find_one({'filename':self.utils.file.filename})
+        old_file = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':initial_filepath.split('/')[-1]})
         self.assertEqual(old_file, None)
 
-        new_file = self.obj.files_coll.find_one({'filename': 'rename-test'})
+        new_file = self.obj.files_coll.find_one({'directory_id':self.utils.root_id,'filename':'rename-test'})
         self.assertNotEqual(new_file, None)
 
     def test_unlock_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename, take_lock=True)
-        result = self.obj.unlock_generic_file(generic_file=gf)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
+        result = self.obj.unlock_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
         self.assertTrue(result)
 
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
         self.assertTrue('lock' not in gf.json)
 
     def test_unlock_generic_file_no_lock(self):
         # Verify if it does not crash if there is no lock
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filename=self.utils.file.filename, take_lock=False)
-        result = self.obj.unlock_generic_file(generic_file=gf)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=False)
+        result = self.obj.unlock_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
         self.assertTrue(result)
 
     def test_basic_save(self):
         self.utils.insert_file()
         self.obj.basic_save(generic_file=self.utils.file, metadata={'st_nlink':1}, attrs={'thing':1})
-        result = self.obj.files_coll.find_one({'filename':self.utils.file.filename})
+        result = self.obj.files_coll.find_one({'_id':self.utils.file._id})
         self.assertTrue('st_nlink' in result['metadata'] and len(result['metadata']) == 1)
         self.assertTrue('thing' in result['attrs'] and len(result['attrs']) == 1)
 

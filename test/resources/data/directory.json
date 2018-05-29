@@ -1,7 +1,7 @@
 {
     "_id" : {"$oid":"5b0964f8eb0a190618865766"},
-    "directory" : "/",
-    "filename" : "/hello",
+    "directory_id" : {"$oid": "5b0da169eb0a19062151820c"},
+    "filename" : "hello",
     "generic_file_type" : 2,
     "metadata" : {
         "st_size" : 0,
