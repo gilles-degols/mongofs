@@ -3,6 +3,7 @@ import errno
 from math import floor, ceil
 from errno import ENOENT, EDEADLOCK
 import time
+import pymongo
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
 from src.core.Configuration import Configuration
@@ -32,6 +33,17 @@ class Mongo:
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
         GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+
+        # Create the initial indexes
+        self.create_indexes()
+
+    """
+        Create various indexes if they do not exist. Only called at startup
+    """
+    def create_indexes(self):
+        Mongo.cache.create_index(self.files_coll, [("directory_id", pymongo.ASCENDING), ("filename", pymongo.ASCENDING)])
+        # Gridfs drivers will automatically add {filename:1, uploadDate:1} as index too, see: https://docs.mongodb.com/manual/core/gridfs/#the-files-index
+
 
     """
         Load the appropriate object for the given json. Should never return a GenericFile, but rather a child class.
@@ -387,3 +399,4 @@ class Mongo:
     def clean_database(self):
         Mongo.cache.drop(self.chunks_coll)
         Mongo.cache.drop(self.files_coll)
+        

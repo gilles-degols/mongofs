@@ -31,6 +31,7 @@ Features development:
 - [x] Integration test
 - [x] Handling unreachable MongoDB instance
 - [ ] Performance improvement (caching, indexes, ...)
+- [ ] Documentation for the configuration file, and the sharding
 - [ ] First stable release
 
 What is not possible with MongoFS:

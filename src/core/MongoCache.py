@@ -92,6 +92,13 @@ class MongoCache:
         mongo_path = 'mongodb://' + ','.join(MongoCache.configuration.mongo_hosts())
         MongoCache.instance = MongoClient(mongo_path)
 
+    """
+        Create an index
+    """
+    @retry_connection
+    def create_index(self, coll, index):
+        return self.database[coll].create_index(index)
+
 
     """
         Get the objects to connect to the correct database and collections
