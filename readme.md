@@ -29,9 +29,8 @@ Features development:
 - [x] File Lock - Experimental (based on the PID)
 - [x] Unit testing
 - [x] Integration test
-- [ ] Scalability test
+- [x] Handling unreachable MongoDB instance
 - [ ] Performance improvement (caching, indexes, ...)
-- [ ] Handling unreachable MongoDB instance
 - [ ] First stable release
 
 What is not possible with MongoFS:

@@ -37,6 +37,16 @@ class Configuration:
         return self.conf['mongo']['prefix']
 
     """
+        Maximum number of seconds we will try to reconnect to MongoDB if we lost the connection at inappropriate time.
+        Value <= 0 means infinity.
+    """
+    def mongo_access_attempt(self):
+        if self.conf['mongo']['access_attempt_s'] <= 0:
+            # Kinda infinite
+            return 3600*24*365*100
+        return self.conf['mongo']['access_attempt_s']
+
+    """
         Return the maximum amount of time (in seconds) we can allow a lock to be set on a file without any operation on it. If the timeout
         happens, we release the lock (to avoid locking file eternity if there is a problem).
         Value <= 0 means infinity.

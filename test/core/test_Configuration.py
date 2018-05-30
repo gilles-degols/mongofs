@@ -18,6 +18,13 @@ class TestConfiguration(unittest.TestCase):
     def test_mongo_prefix(self):
         self.assertEqual(self.obj.mongo_prefix(), "mongofsTests_")
 
+    def test_mongo_access_attempt(self):
+        self.assertEqual(self.obj.mongo_access_attempt(), 6)
+
+    def test_mongo_access_attempt_infinite(self):
+        self.obj.conf['mongo']['access_attempt_s'] = 0
+        self.assertTrue(self.obj.mongo_access_attempt() >= 3600*24*365)
+
     def test_lock_timeout(self):
         self.assertEqual(self.obj.lock_timeout(), 6)
 

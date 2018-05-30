@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import logging
 import time
+import os
 
 from sys import argv, exit
 from errno import ENOENT
@@ -18,6 +19,9 @@ from src.core.Mongo import Mongo
     List of fuse low-level methods: https://pike.lysator.liu.se/generated/manual/modref/ex/predef_3A_3A/Fuse/Operations/
 """
 class MongoFS(LoggingMixIn, Operations):
+    # This is useful to be able to umount if there is an error to access MongoDB for example
+    mounting_point = None
+
     def __init__(self):
         self.configuration = Configuration()
         self.mongo = Mongo()
@@ -234,6 +238,10 @@ if __name__ == '__main__':
     if len(argv) == 3:
         configuration_filepath = argv[2]
         Configuration.FILEPATH = configuration_filepath
+
+    # If the previous mount failed, we need to be sure to umount it, otherwise you will not be able to mount anymore
+    Configuration.mounting_point = argv[1]
+    os.system('fusermount -u ' + str(argv[1])+' &>/dev/null')
 
     logging.basicConfig(level=logging.DEBUG)
     fuse = FUSE(MongoFS(), argv[1], foreground=True)
