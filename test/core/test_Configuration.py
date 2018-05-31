@@ -39,6 +39,12 @@ class TestConfiguration(unittest.TestCase):
         self.obj.conf['lock']['access_attempt_s'] = 0
         self.assertTrue(self.obj.lock_access_attempt() >= 3600*24*365)
 
+    def test_cache_timeout(self):
+        self.assertEqual(self.obj.cache_timeout(), 2)
+
+    def test_cache_max_elements(self):
+        self.assertEqual(self.obj.cache_max_elements(), 10000)
+
     def test_hostname(self):
         self.assertEqual(self.obj.hostname(), "localhost")
 

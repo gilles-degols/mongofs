@@ -399,4 +399,3 @@ class Mongo:
     def clean_database(self):
         Mongo.cache.drop(self.chunks_coll)
         Mongo.cache.drop(self.files_coll)
-        

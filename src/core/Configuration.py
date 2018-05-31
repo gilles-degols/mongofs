@@ -67,6 +67,25 @@ class Configuration:
             return 3600*24*365*100
         return self.conf['lock']['access_attempt_s']
 
+    """ 
+        Return the maximum amount of time (in seconds) we can keep the cache for a file. Can be very high if standalone
+        MongoDB, should be reasonnable if we are in a cluster (a few seconds). Only used for the file attributes, not the
+        data themselves.
+        Value <= 0 means disabled.
+    """
+    def cache_timeout(self):
+        if self.conf['cache']['timeout_s'] <= 0:
+            return 0
+        return self.conf['cache']['timeout_s']
+
+    """
+        Return the maximum number of entries we can keep in the cache.
+    """
+    def cache_max_elements(self):
+        if self.conf['cache']['max_elements'] <= 0:
+            return 0
+        return self.conf['cache']['max_elements']
+
     """
         Return the hostname of the current server
     """

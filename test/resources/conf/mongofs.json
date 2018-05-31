@@ -5,6 +5,10 @@
     "prefix": "mongofsTests_",
     "access_attempt_s": 6
   },
+  "cache": {
+    "timeout_s": 2,
+    "max_elements": 10000
+  },
   "host": "localhost",
   "lock":{
     "access_attempt_s": 6,

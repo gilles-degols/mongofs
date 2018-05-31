@@ -6,6 +6,7 @@ import os
 import signal
 import subprocess
 import time
+from expiringdict import ExpiringDict
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
 from pymongo.errors import PyMongoError
@@ -52,7 +53,8 @@ def retry_connection(view_func):
                     time.sleep(0.5)
                     mongo_cache.connect()
                     mongo_cache.load_internal()
-
+                # To easily see the queries done
+                # print('Run mongo query: '+str(args)+' with '+str(kwargs))
                 response = view_func(*args, **kwargs)
                 return response
             except PyMongoError as e:
@@ -77,13 +79,21 @@ def retry_connection(view_func):
 class MongoCache:
     instance = None
     configuration = None
+    cache = None
 
     def __init__(self):
         # We reuse the same connexion
         if MongoCache.instance is None:
             MongoCache.configuration = Configuration()
+            self.reset_cache()
             retry_connection(self.connect())
         retry_connection(self.load_internal())
+
+    """
+        Reset the cache completely. This should be done every time we delete / update more than 1 thing to avoid problems.
+    """
+    def reset_cache(self):
+        MongoCache.cache = ExpiringDict(max_len=MongoCache.configuration.cache_max_elements(), max_age_seconds=MongoCache.configuration.cache_timeout())
 
     """
         Establish a connection to mongodb
@@ -91,6 +101,9 @@ class MongoCache:
     def connect(self):
         mongo_path = 'mongodb://' + ','.join(MongoCache.configuration.mongo_hosts())
         MongoCache.instance = MongoClient(mongo_path)
+
+        # If we were disconnected from MongoDB, it would be wise to reset the cache
+        self.reset_cache()
 
     """
         Create an index
@@ -118,6 +131,34 @@ class MongoCache:
     """
     @retry_connection
     def find_one(self, coll, query):
+        # Super important note: By allowing ">= 2" and not "=2" parameters, we open the door to potential problems as we do
+        # not check the other fields in the query... As we only have a few of them, we can do the check ourselves, but
+        # that's not pretty at all.
+        if len(query) >= 2 and 'directory_id' in query and 'filename' in query:
+            # In that case we check in the cache
+            key = str(query['directory_id'])+'/'+query['filename']
+            if key in MongoCache.cache:
+                # We do some manual checks
+                doc = MongoCache.cache.get(key)
+                valid_doc = True
+                if 'generic_file_type' in query:
+                    valid_doc = valid_doc and doc['generic_file_type'] == query['generic_file_type']
+                if 'lock' in query and '$exists' in query['lock']:
+                    if 'lock' in doc['lock'] and query['lock']['$exists'] is False:
+                        valid_doc = valid_doc and False
+                    elif 'lock' not in doc['lock'] and query['lock']['$exists'] is True:
+                        valid_doc = valid_doc and False
+
+                if valid_doc is False:
+                    return None
+                return doc
+
+            # Key not found in cache, we try to load the object and store it before returning it (only if the document exists)
+            res = self.database[coll].find_one(query)
+            if res is not None:
+                MongoCache.cache[key] = res
+            return res
+
         return self.database[coll].find_one(query)
 
     """
@@ -133,7 +174,14 @@ class MongoCache:
     """
     @retry_connection
     def find_one_and_update(self, coll, query, update):
-        return self.database[coll].find_one_and_update(query, update, return_document=ReturnDocument.AFTER)
+        result = self.database[coll].find_one_and_update(query, update, return_document=ReturnDocument.AFTER)
+
+        if coll.endswith('.files') and result is not None:
+            # We directly update the document in the cache.
+            key = str(result['directory_id']) + '/' + str(result['filename'])
+            MongoCache.cache[key] = result
+
+        return result
 
     """
         A simple insert_one
@@ -147,6 +195,7 @@ class MongoCache:
     """
     @retry_connection
     def delete_many(self, coll, query):
+        self.reset_cache()
         return self.database[coll].delete_many(query)
 
     """
@@ -169,4 +218,5 @@ class MongoCache:
     """
     @retry_connection
     def drop(self, coll):
+        self.reset_cache()
         return self.database[coll].drop()

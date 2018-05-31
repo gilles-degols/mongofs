@@ -30,15 +30,17 @@ Features development:
 - [x] Unit testing
 - [x] Integration test
 - [x] Handling unreachable MongoDB instance
-- [ ] Performance improvement (caching, indexes, ...)
+- [x] Performance improvement (caching, indexes, ...)
 - [ ] Documentation for the configuration file, and the sharding
 - [ ] First stable release
 
-What is not possible with MongoFS:
+What is not possible or recommended with MongoFS:
 
 1. Any limitation related to the underlying FUSE file system, and the fusepy library on top of it, which includes:
 
   1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
+
+2. Expecting 100MB/s as writing speed. There is an overhead to decode, then store the data in MongoDB.
 
 ### Developer's guide
 
