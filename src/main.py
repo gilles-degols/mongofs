@@ -30,13 +30,13 @@ class MongoFS(LoggingMixIn, Operations):
         # Additional setup
         GenericFile.mongo = self.mongo
 
-        # START DEBUG ONLY - Drop the old information from MongoDB
-        self.mongo.clean_database()
-        self.mongo = Mongo() # Create a new instance to be sure to have the top folder
-        # END DEBUG ONLY
+        if self.configuration.is_development():
+            # START DEBUG ONLY - Drop the old information from MongoDB
+            self.mongo.clean_database()
+            self.mongo = Mongo() # Create a new instance to be sure to have the top folder
+            # END DEBUG ONLY
 
-        # We need to be sure to have the top folder created in MongoDB
-        #self.mkdir(path='/', mode=0o755)
+        # The top folder of the FS is automatically created by the Mongo class.
     """
         Create a file and returns a "file descriptor", which is in fact, simply the _id.
     """

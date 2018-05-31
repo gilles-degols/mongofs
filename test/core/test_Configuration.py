@@ -45,6 +45,9 @@ class TestConfiguration(unittest.TestCase):
     def test_cache_max_elements(self):
         self.assertEqual(self.obj.cache_max_elements(), 10000)
 
+    def test_is_development(self):
+        self.assertEqual(self.obj.is_development(), True)
+
     def test_hostname(self):
         self.assertEqual(self.obj.hostname(), "localhost")
 

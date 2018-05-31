@@ -9,6 +9,7 @@
     "timeout_s": 5,
     "max_elements": 10000
   },
+  "development": false,
   "host": "localhost",
   "lock":{
     "access_attempt_s": 6,

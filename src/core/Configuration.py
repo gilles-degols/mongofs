@@ -91,3 +91,9 @@ class Configuration:
     """
     def hostname(self):
         return self.conf['host']
+
+    """
+        Indicates if we are in a development mode (= clean database before mount for example) or not.
+    """
+    def is_development(self):
+        return self.conf['development']
