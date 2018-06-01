@@ -1,3 +1,4 @@
+#!/usr/lib/mongofs/environment/bin/python3.6
 import json
 
 """

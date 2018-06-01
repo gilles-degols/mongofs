@@ -32,7 +32,7 @@ Features development:
 - [x] Handling unreachable MongoDB instance
 - [x] Performance improvement (caching, indexes, ...)
 - [ ] Documentation for the configuration file, and the sharding
-- [ ] First stable release
+- [x] First stable release
 
 What is not possible or recommended with MongoFS:
 
@@ -91,4 +91,19 @@ rmdir /mnt/data
 # Note: the command below might not work directly / at first attempt. Feel free to retry it.
 fusermount -u /mnt/data
 rmdir /mnt/data
+```
+
+5. Create a new release
+
+Set up your environment:
+```
+yum install -y rpm-build
+mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+```
+
+Generate a new archive containing all the sources in Github, in the appropriate directory. Then, generate the rpm.
+```
+cp -r mongofs mongofs-1.0.0
+tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.0.0.tar.gz mongofs-1.0.0
+QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs/spec/mongofs.spec
 ```

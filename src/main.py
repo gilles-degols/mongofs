@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/lib/mongofs/environment/bin/python3.6
+
 import logging
 import time
 import os
@@ -228,7 +229,7 @@ class MongoFS(LoggingMixIn, Operations):
         General (static) information about the current file system.
     """
     def statfs(self, path):
-        return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
+        return dict(f_bsize=512, f_blocks=65536, f_bavail=2048)
 
 if __name__ == '__main__':
     if len(argv) < 2:
@@ -243,5 +244,10 @@ if __name__ == '__main__':
     Configuration.mounting_point = argv[1]
     os.system('fusermount -u ' + str(argv[1])+' &>/dev/null')
 
-    logging.basicConfig(level=logging.DEBUG)
-    fuse = FUSE(MongoFS(), argv[1], foreground=True)
+    configuration = Configuration()
+    if configuration.is_development():
+        logging.basicConfig(level=logging.DEBUG)
+        fuse = FUSE(MongoFS(), argv[1], foreground=True, nothreads=True, allow_other=True)
+    else:
+        logging.basicConfig(level=logging.ERROR)
+        fuse = FUSE(MongoFS(), argv[1], foreground=False, nothreads=False, allow_other=True)

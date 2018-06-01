@@ -1,3 +1,4 @@
+#!/usr/lib/mongofs/environment/bin/python3.6
 import os
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 import time

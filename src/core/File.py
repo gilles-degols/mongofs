@@ -1,3 +1,4 @@
+#!/usr/lib/mongofs/environment/bin/python3.6
 from src.core.GenericFile import GenericFile
 
 class File(GenericFile):

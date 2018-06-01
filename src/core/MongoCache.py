@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/lib/mongofs/environment/bin/python3.6
 import errno
 from math import floor, ceil
 from errno import ENOENT, EDEADLOCK
