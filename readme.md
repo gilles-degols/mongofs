@@ -7,7 +7,7 @@ Tested Python version: 3.6.
 
 ### General information
 Mount a Mongo database as a FUSE file system. Purpose of this implementation is the following:
-1. Allows infinite scaling, up to Petabytes of data.
+1. Scaling only limited to your MongoDB installation.
 2. Avoid limitations of basic file systems by allowing the following: 
    - You can put millions of files in the same directory
    - Infinite hierarchy
@@ -15,7 +15,6 @@ Mount a Mongo database as a FUSE file system. Purpose of this implementation is 
    - Automatic compression
    - Easier setup than HDFS (and more appropriate for small files)
    - Faster creation/deletion of millions of files 
-   - Super-fast listing of files, and computation of total directory size.
    - No "advanced" problems that you could find with inodes, ... once you start to have millions of files.
 
 Features development:
@@ -31,7 +30,7 @@ Features development:
 - [x] Integration test
 - [x] Handling unreachable MongoDB instance
 - [x] Performance improvement (caching, indexes, ...)
-- [ ] Documentation for the configuration file, and the sharding
+- [x] Documentation for the configuration file
 - [x] First stable release
 
 What is not possible or recommended with MongoFS:
@@ -41,6 +40,22 @@ What is not possible or recommended with MongoFS:
   1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
 
 2. Expecting 100MB/s as writing speed. There is an overhead to decode, then store the data in MongoDB.
+
+### Installation guide
+
+1. Install the different packages
+```
+yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.0.0/mongofs-1.0.0-0.noarch.rpm
+```
+
+2. Mount the file system with the default parameters in /etc/mongofs/mongofs.json
+
+For more information about the configuration parameters, check the appropriate section below.
+```
+sudo mongofs-mount /mnt/data
+```
+
 
 ### Developer's guide
 
@@ -107,3 +122,20 @@ cp -r mongofs mongofs-1.0.0
 tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.0.0.tar.gz mongofs-1.0.0
 QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs/spec/mongofs.spec
 ```
+
+### Configuration parameters
+
+Default configuration parameters can be seen in conf/mongofs.json, every one of them must be set otherwise MongoFS will not work.
+
+1. mongo.hosts: List of hosts of your MongoDB cluster. You can also put a list of Mongos instances if you have a sharded cluster.
+2. mongo.database: Database to store the MongoFS data.
+3. mongo.prefix: A prefix for the collections created by MongoFS inside the database given by "mongo.database".
+4. mongo.access_attempt_s: Minimum number of seconds we will try to reconnect to MongoDB if there is a connection issue. Put 0 for infinity.
+5. cache.timeout_s: Maximum number of seconds we can keep a cache of file (so, without contacting the database). Highly recommended to have at least "1" as value. Put 0 to deactivate that functionality.
+6. cache.max_elements: Maximum number of files (metadata only) we can keep in the cache.
+7. development: Activate the development mode if set to true, in that case the mount is in foreground, the logs are activated, and the data are wipped at every mount.
+8. host: Current hostname of the machine itself (so, it should be unique), to manage file locks.
+9. lock.access_attempt_s: Number of seconds we try to access to a locked file before giving up and returning an error to the client. Put 0 for infinity.
+10. lock.timeout_s: Maximum number of seconds we consider a lock valid. To avoid a deadlock if a server is down, we delete the lock after that amount of time. Put 0 for infinity.
+
+
