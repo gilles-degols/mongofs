@@ -99,10 +99,8 @@ class MongoFS(LoggingMixIn, Operations):
         Read a part of a file
     """
     def read(self, path, size, offset, fh):
-        print('Try to read...'+str(path)+', '+str(size)+', '+str(offset))
         file = self.mongo.get_generic_file(filepath=path)
         tmp =  file.read_data(offset=offset, size=size)
-        print('Size: '+str(len(tmp))+' vs '+str(size))
         return tmp
 
     """
@@ -239,7 +237,6 @@ class MongoFS(LoggingMixIn, Operations):
         Flush data to MongoDB
     """
     def flush(self, path, fh):
-        print('Call flush for '+path)
         file = self.mongo.get_generic_file(filepath=path)
         self.mongo.flush_data_to_write(file=file)
         return None

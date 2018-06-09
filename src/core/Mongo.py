@@ -342,17 +342,18 @@ class Mongo:
         # part of the file modified. As soon as the order is not strictly respected, we flush the cache to MongoDB.
         key = str(file.directory_id) + '/' + file.filename
         if key not in self.data_cache:
-            self.data_cache[key] = {'offset':offset,'data':b''}
+            self.data_cache[key] = {'offset':offset,'data':bytearray(b'')}
 
         # Check if we need to flush the cache
         max_size = 10*1024*1024
         if self.data_cache[key]['offset'] + len(self.data_cache[key]['data']) != offset or len(self.data_cache[key]['data']) >= max_size:
             print('Writting to another part of the file, flush the previous data.')
-            self.add_data(file=file, data=self.data_cache[key]['data'], offset=self.data_cache[key]['offset'], use_cache=False)
+            self.add_data(file=file, data=bytes(self.data_cache[key]['data']), offset=self.data_cache[key]['offset'], use_cache=False)
             # Reset the cache for the new entry we will just add
-            self.data_cache[key] = {'offset':offset,'data':b''}
+            self.data_cache[key] = {'offset':offset,'data':bytearray(b'')}
 
-        self.data_cache[key]['data'] += data
+        new_data = bytearray(data)
+        self.data_cache[key]['data'] += new_data
 
         return True
 
@@ -362,7 +363,7 @@ class Mongo:
     def flush_data_to_write(self, file):
         key = str(file.directory_id) + '/' + file.filename
         if key in self.data_cache:
-            self.add_data(file=file, data=self.data_cache[key]['data'], offset=self.data_cache[key]['offset'],use_cache=False)
+            self.add_data(file=file, data=bytes(self.data_cache[key]['data']), offset=self.data_cache[key]['offset'],use_cache=False)
             del self.data_cache[key]
         return True
 
