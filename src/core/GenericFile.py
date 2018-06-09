@@ -1,6 +1,7 @@
 #!/usr/lib/mongofs/environment/bin/python3.6
 import os
 from stat import S_IFDIR, S_IFLNK, S_IFREG
+from math import ceil
 import time
 
 """
@@ -127,6 +128,7 @@ class GenericFile:
         if file_type == GenericFile.FILE_TYPE:
             struct['metadata']['st_nlink'] = 1
             struct['metadata']['st_mode'] = (S_IFREG | mode)
+            struct['metadata']['st_blocks'] = 0
         elif file_type == GenericFile.DIRECTORY_TYPE:
             # If this is a directory, the default value st_nlink must be 2, to be sure to have a non-zero value if there is no
             # referenced file in the directory
@@ -136,6 +138,7 @@ class GenericFile:
             struct['metadata']['st_nlink'] = 1
             struct['metadata']['st_mode'] = (S_IFLNK | mode)
             struct['metadata']['st_size'] = len(filename)
+            struct['metadata']['st_blocks'] = 1
             struct['length'] = len(filename)
             struct['target'] = target
         else:
@@ -199,3 +202,10 @@ class GenericFile:
             return False
 
         return True
+
+    """
+        Return the appropriate number of blocks for a given file size
+    """
+    @staticmethod
+    def size_to_blocks(length):
+        return int(ceil(length / 65536))

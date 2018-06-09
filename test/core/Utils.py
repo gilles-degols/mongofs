@@ -73,7 +73,11 @@ class Utils:
     def insert_symbolic_link(self):
         self.files_coll.insert_one(self.symbolic_link_raw)
 
-    def read_file_chunks(self):
+    def read_file_chunks(self, flush=True):
+        # To avoid cache problems, we flush the content before
+        if flush is True:
+            self.mongo.flush_data_to_write(self.file)
+
         message = b''
         for chunk in self.chunks_coll.find({'files_id':self.file._id}):
             message += chunk['data']

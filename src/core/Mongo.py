@@ -37,6 +37,9 @@ class Mongo:
         # Create the initial indexes
         self.create_indexes()
 
+        # Temporary cache for the file data
+        self.data_cache = {}
+
     """
         Create various indexes if they do not exist. Only called at startup
     """
@@ -261,11 +264,9 @@ class Mongo:
 
         starting_offset = offset % chunk_size
         data = b''
-        print('Read chunks between '+str(starting_chunk)+' & '+str(ending_chunk))
         for chunk in Mongo.cache.find(self.chunks_coll, {'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
             ending_size = min(starting_offset + size, chunk_size)
             data += chunk['data'][starting_offset:ending_size]
-            print('Read bytes between ' + str(starting_offset) + ' & ' + str(ending_size) + ' with size: ' + str(size) + ' & chunk size: ' + str(chunk_size)+' -> Got '+str(len(chunk['data'][starting_offset:ending_size]))+' bytes.')
 
             size -= (ending_size - starting_offset)
             starting_offset = 0
@@ -275,11 +276,16 @@ class Mongo:
         Add data to a file. 
          file: Instance of a "File" type object.
          data: bytes 
+         use_cache: True by default, can only be set to "False" if called by add_data_to_write
     """
-    def add_data(self, file, data, offset):
+    def add_data(self, file, data, offset, use_cache=True):
         # Normally, we should not update a gridfs document, but re-write everything. I don't see any specific reason
         # to do that, so we will try to update it anyway. But we will only rewrite the last chunks of it, or add information
         # to them, while keeping the limitation of ~255KB/chunk
+
+        # We try to cache data
+        if use_cache is True:
+            return self.add_data_to_write(file=file, data=data, offset=offset)
 
         # Final size after the update
         total_size = offset + len(data)
@@ -323,8 +329,41 @@ class Mongo:
                 total_chunks += 1
 
         # We update the total length and that's it
-        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size,'metadata.st_blocks':GenericFile.size_to_blocks(total_size)}})
 
+        return True
+
+    """
+        Keep a cache to write large chunks of data more efficiently. If the data becomes too big (> 10MB), flush it
+        directly to the file. Otherwise it waits for the appropriate "flush" called at the end of the operation.
+    """
+    def add_data_to_write(self, file, data, offset):
+        # The cache used here is not smart at all: We only cache successive data in a file, we do not care about specific
+        # part of the file modified. As soon as the order is not strictly respected, we flush the cache to MongoDB.
+        key = str(file.directory_id) + '/' + file.filename
+        if key not in self.data_cache:
+            self.data_cache[key] = {'offset':offset,'data':b''}
+
+        # Check if we need to flush the cache
+        max_size = 10*1024*1024
+        if self.data_cache[key]['offset'] + len(self.data_cache[key]['data']) != offset or len(self.data_cache[key]['data']) >= max_size:
+            print('Writting to another part of the file, flush the previous data.')
+            self.add_data(file=file, data=self.data_cache[key]['data'], offset=self.data_cache[key]['offset'], use_cache=False)
+            # Reset the cache for the new entry we will just add
+            self.data_cache[key] = {'offset':offset,'data':b''}
+
+        self.data_cache[key]['data'] += data
+
+        return True
+
+    """
+        Flush the cache for a specific file
+    """
+    def flush_data_to_write(self, file):
+        key = str(file.directory_id) + '/' + file.filename
+        if key in self.data_cache:
+            self.add_data(file=file, data=self.data_cache[key]['data'], offset=self.data_cache[key]['offset'],use_cache=False)
+            del self.data_cache[key]
         return True
 
     """
@@ -345,7 +384,7 @@ class Mongo:
             Mongo.cache.find_one_and_update(self.chunks_coll, {'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
 
         # We update the total length and that's it
-        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':length,'metadata.st_size':length}})
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':length,'metadata.st_size':length,'metadata.st_blocks':GenericFile.size_to_blocks(length)}})
         return True
 
     """
