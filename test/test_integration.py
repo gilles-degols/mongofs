@@ -117,6 +117,12 @@ class TestIntegration(unittest.TestCase):
         res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/hello')
         self.assertEqual(res.stdout.strip(), "some text")
 
+
+    def test_read_big_file(self):
+        self.execute_command(command='yes "a" | dd of=' + TestIntegration.TEST_DIRECTORY + '/output.dat bs=1M count=1')
+        res = self.execute_command(command='cat ' + TestIntegration.TEST_DIRECTORY + '/output.dat')
+        self.assertEqual(len(res.stdout), 1024*1024)
+
     def test_mkdir(self):
         res = self.execute_command(command='mkdir ' + TestIntegration.TEST_DIRECTORY + '/hello')
         self.assertEqual(res.returncode, 0)

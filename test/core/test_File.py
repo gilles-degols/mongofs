@@ -68,7 +68,7 @@ class TestGenericFile(unittest.TestCase):
         self.assertEqual(data, message[:8])
 
         data = self.utils.file.read_data(offset=3, size=8)
-        self.assertEqual(data, message[3:8])
+        self.assertEqual(data, message[3:3+8])
 
     def test_truncate(self):
         self.utils.insert_file()

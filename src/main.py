@@ -99,8 +99,11 @@ class MongoFS(LoggingMixIn, Operations):
         Read a part of a file
     """
     def read(self, path, size, offset, fh):
+        print('Try to read...'+str(path)+', '+str(size)+', '+str(offset))
         file = self.mongo.get_generic_file(filepath=path)
-        return file.read_data(offset=offset, size=size)
+        tmp =  file.read_data(offset=offset, size=size)
+        print('Size: '+str(len(tmp))+' vs '+str(size))
+        return tmp
 
     """
         Delete a file
@@ -136,8 +139,12 @@ class MongoFS(LoggingMixIn, Operations):
         Write data to a file, from a specific offset. Returns the written data size
     """
     def write(self, path, data, offset, fh):
+        st = time.time()
         file = self.mongo.get_generic_file(filepath=path)
         file.add_data(data=data, offset=offset)
+        dt = time.time() - st
+        ratio = len(data) / (dt * 1024 * 1024)
+        print('Writing speed: '+str(int(ratio))+' MB/s. Size: '+str(len(data))+' bytes.')
         return len(data)
 
     """
@@ -229,7 +236,7 @@ class MongoFS(LoggingMixIn, Operations):
         General (static) information about the current file system.
     """
     def statfs(self, path):
-        return dict(f_bsize=512, f_blocks=65536, f_bavail=2048)
+        return dict(f_bsize=65536, f_blocks=65536, f_bavail=65536)
 
 if __name__ == '__main__':
     if len(argv) < 2:
@@ -247,6 +254,7 @@ if __name__ == '__main__':
     configuration = Configuration()
     if configuration.is_development():
         logging.basicConfig(level=logging.DEBUG)
+        #logging.basicConfig(level=logging.ERROR)
         fuse = FUSE(MongoFS(), argv[1], foreground=True, nothreads=True, allow_other=True)
     else:
         logging.basicConfig(level=logging.ERROR)

@@ -260,12 +260,14 @@ class Mongo:
         ending_chunk = int(floor((offset + size) / chunk_size))
 
         starting_offset = offset % chunk_size
-        ending_size = chunk_size
         data = b''
+        print('Read chunks between '+str(starting_chunk)+' & '+str(ending_chunk))
         for chunk in Mongo.cache.find(self.chunks_coll, {'files_id':file._id,'n':{'$gte':starting_chunk,'$lte':ending_chunk}}):
-            if chunk['n'] == ending_chunk:
-                ending_size = size % chunk_size
+            ending_size = min(starting_offset + size, chunk_size)
             data += chunk['data'][starting_offset:ending_size]
+            print('Read bytes between ' + str(starting_offset) + ' & ' + str(ending_size) + ' with size: ' + str(size) + ' & chunk size: ' + str(chunk_size)+' -> Got '+str(len(chunk['data'][starting_offset:ending_size]))+' bytes.')
+
+            size -= (ending_size - starting_offset)
             starting_offset = 0
         return data
 
