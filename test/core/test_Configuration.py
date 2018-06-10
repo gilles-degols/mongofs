@@ -45,6 +45,12 @@ class TestConfiguration(unittest.TestCase):
     def test_cache_max_elements(self):
         self.assertEqual(self.obj.cache_max_elements(), 10000)
 
+    def test_data_cache_timeout(self):
+        self.assertEqual(self.obj.data_cache_timeout(), 2)
+
+    def test_data_cache_max_elements(self):
+        self.assertEqual(self.obj.data_cache_max_elements(), 50)
+
     def test_is_development(self):
         self.assertEqual(self.obj.is_development(), True)
 

@@ -39,7 +39,7 @@ What is not possible or recommended with MongoFS:
 
   1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
 
-2. Expecting 100MB/s as writing speed. There is an overhead to decode, then store the data in MongoDB.
+2. Expecting 100MB/s as writing speed. There is an overhead to decode, then store the data in MongoDB. But the slowest part is fusepy so we cannot improve much more the current code. Check benchmarks below if you want some numbers.
 
 ### Installation guide
 
@@ -123,6 +123,28 @@ tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.0.0.tar.gz mongofs-1.0.0
 QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs/spec/mongofs.spec
 ```
 
+6. Benchmarks
+
+If you want to test the performance of MongoFS versus your file system, you can easily test the handling of big files. The numbers given below were generated on a VM with 3GB of RAM & 4vCPU hosted on a Desktop computer with 16GB of RAM & SSD. So the reading speed is not strictly related to the disk as everything might be in cache on the OS level.
+Benchmarking is a difficult subject, so be careful when you compare numbers.
+Be aware that FUSE + fusepy (library used in mongofs) is in fact the slowest part of writing, and unfortunately we cannot improve the performance a lot more until it is improved on their side.
+```
+python3.6 -m src.main /mnt/data conf/mongofs.json
+
+# Test local file system
+yes "a" | dd of=output.dat bs=4k count=2500000 iflag=fullblock && time cat output.dat > /dev/null
+# ~80MB/s (writing), ~273MB/s (reading)
+
+# Test MongoFS with a local MongoDB instance (small block size)
+yes "a" | dd of=/mnt/data/output.dat bs=4k count=2500000 iflag=fullblock && time cat /mnt/data/output.dat > /dev/null
+# ~8MB/s (writing), ~56MB/s (reading)
+
+# Test MongoFS with a local MongoDB instance (bigger block size)
+yes "a" | dd of=/mnt/data/output.dat bs=10M count=1000 iflag=fullblock && time cat /mnt/data/output.dat > /dev/null
+# ~13MB/s (writing), ~56MB/s (reading)
+
+```
+
 ### Configuration parameters
 
 Default configuration parameters can be seen in conf/mongofs.json, every one of them must be set otherwise MongoFS will not work.
@@ -131,11 +153,14 @@ Default configuration parameters can be seen in conf/mongofs.json, every one of 
 2. mongo.database: Database to store the MongoFS data.
 3. mongo.prefix: A prefix for the collections created by MongoFS inside the database given by "mongo.database".
 4. mongo.access_attempt_s: Minimum number of seconds we will try to reconnect to MongoDB if there is a connection issue. Put 0 for infinity.
-5. cache.timeout_s: Maximum number of seconds we can keep a cache of file (so, without contacting the database). Highly recommended to have at least "1" as value. Put 0 to deactivate that functionality.
-6. cache.max_elements: Maximum number of files (metadata only) we can keep in the cache.
-7. development: Activate the development mode if set to true, in that case the mount is in foreground, the logs are activated, and the data are wipped at every mount.
-8. host: Current hostname of the machine itself (so, it should be unique), to manage file locks.
-9. lock.access_attempt_s: Number of seconds we try to access to a locked file before giving up and returning an error to the client. Put 0 for infinity.
-10. lock.timeout_s: Maximum number of seconds we consider a lock valid. To avoid a deadlock if a server is down, we delete the lock after that amount of time. Put 0 for infinity.
+5. mongo.chunk_size: Each file is split in several chunks of the given size. Value must be between 1 bytes and 15MB.
+6. cache.timeout_s: Maximum number of seconds we can keep a cache of file (so, without contacting the database). Highly recommended to have at least "1" as value. Put 0 to deactivate that functionality.
+7. cache.max_elements: Maximum number of files (metadata only) we can keep in the cache.
+8. data_cache.timeout_s: Maximum number of seconds we can keep a cache of file data (so, without contacting the database). Highly recommended to have at least "1" as value. Put 0 to deactivate that functionality.
+9. data_cache.max_elements: Maximum number of chunks of data we can keep in the cache.
+10. development: Activate the development mode if set to true, in that case the mount is in foreground, the logs are activated, and the data are wipped at every mount.
+11. host: Current hostname of the machine itself (so, it should be unique), to manage file locks.
+12. lock.access_attempt_s: Number of seconds we try to access to a locked file before giving up and returning an error to the client. Put 0 for infinity.
+13. lock.timeout_s: Maximum number of seconds we consider a lock valid. To avoid a deadlock if a server is down, we delete the lock after that amount of time. Put 0 for infinity.
 
 

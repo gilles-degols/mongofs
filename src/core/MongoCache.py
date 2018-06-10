@@ -16,6 +16,7 @@ from src.core.Configuration import Configuration
 from pymongo.collection import ReturnDocument
 
 from functools import wraps
+import copy
 
 """
     Custom decorator to easily handle a MongoDB disconnection.
@@ -94,13 +95,14 @@ class MongoCache:
     """
     def reset_cache(self):
         MongoCache.cache = ExpiringDict(max_len=MongoCache.configuration.cache_max_elements(), max_age_seconds=MongoCache.configuration.cache_timeout())
+        MongoCache.data_cache = ExpiringDict(max_len=MongoCache.configuration.data_cache_max_elements(), max_age_seconds=MongoCache.configuration.data_cache_timeout())
 
     """
         Establish a connection to mongodb
     """
     def connect(self):
         mongo_path = 'mongodb://' + ','.join(MongoCache.configuration.mongo_hosts())
-        MongoCache.instance = MongoClient(mongo_path)
+        MongoCache.instance = MongoClient(mongo_path, w=MongoCache.configuration.mongo_write_acknowledgement(), j=MongoCache.configuration.mongo_write_j())
 
         # If we were disconnected from MongoDB, it would be wise to reset the cache
         self.reset_cache()
@@ -137,21 +139,26 @@ class MongoCache:
         if len(query) >= 2 and 'directory_id' in query and 'filename' in query:
             # In that case we check in the cache
             key = str(query['directory_id'])+'/'+query['filename']
-            if key in MongoCache.cache:
-                # We do some manual checks
-                doc = MongoCache.cache.get(key)
-                valid_doc = True
-                if 'generic_file_type' in query:
-                    valid_doc = valid_doc and doc['generic_file_type'] == query['generic_file_type']
-                if 'lock' in query and '$exists' in query['lock']:
-                    if 'lock' in doc['lock'] and query['lock']['$exists'] is False:
-                        valid_doc = valid_doc and False
-                    elif 'lock' not in doc['lock'] and query['lock']['$exists'] is True:
-                        valid_doc = valid_doc and False
 
-                if valid_doc is False:
-                    return None
-                return doc
+            if key in MongoCache.cache:
+                try:
+                    # We do some manual checks
+                    doc = MongoCache.cache[key]
+                    valid_doc = True
+                    if 'generic_file_type' in query:
+                        valid_doc = valid_doc and doc['generic_file_type'] == query['generic_file_type']
+                    if 'lock' in query and '$exists' in query['lock']:
+                        if 'lock' in doc['lock'] and query['lock']['$exists'] is False:
+                            valid_doc = False
+                        elif 'lock' not in doc['lock'] and query['lock']['$exists'] is True:
+                            valid_doc = False
+
+                    if valid_doc is False:
+                        return None
+                    return doc
+                except Exception as e:
+                    # The document might be deleted as the clean up could occur just 1ms afterwards when we access some attributes
+                    print('Exception while using the cache, it might happen some times (normally there should not be any impact): '+str(e))
 
             # Key not found in cache, we try to load the object and store it before returning it (only if the document exists)
             res = self.database[coll].find_one(query)
@@ -167,6 +174,18 @@ class MongoCache:
     """
     @retry_connection
     def find(self, coll, query, projection=None):
+        # We need a small data cache for some blocks
+        if len(query) == 2 and 'files_id' in query and 'n' in query and '$gte' in query['n'] and '$lte' in query['n']:
+            key = str(query['files_id'])+'/'+str(query['n']['$gte'])+'/'+str(query['n']['$lte'])
+            if key in MongoCache.data_cache:
+                # Be careful: the clean up could occur just 1ms afterwards when we access some attributes
+                return MongoCache.data_cache[key]
+
+            # Data not found in cache, we need to store it
+            raw = list(self.database[coll].find(query, projection, no_cursor_timeout=True))
+            MongoCache.data_cache[key] = raw
+            return raw
+
         return self.database[coll].find(query, projection, no_cursor_timeout=True)
 
     """
@@ -180,6 +199,10 @@ class MongoCache:
             # We directly update the document in the cache.
             key = str(result['directory_id']) + '/' + str(result['filename'])
             MongoCache.cache[key] = result
+        elif coll.endswith('.chunks') and result is not None:
+            # We simply reset the data cache to avoid complicating things if we update a document.
+            MongoCache.data_cache = ExpiringDict(max_len=MongoCache.configuration.data_cache_max_elements(),
+                                                 max_age_seconds=MongoCache.configuration.data_cache_timeout())
 
         return result
 

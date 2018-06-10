@@ -48,6 +48,20 @@ class Configuration:
         return self.conf['mongo']['access_attempt_s']
 
     """
+        Write concern to write to MongoDB. 0 disable write acknowledgement
+        Value <= 0 means infinity.
+    """
+    def mongo_write_acknowledgement(self):
+        return self.conf['mongo']['write_acknowledgement']
+
+    """
+        If set to True, wait for the MongoDB journaling to acknowledge the write
+        Value <= 0 means infinity.
+    """
+    def mongo_write_j(self):
+        return self.conf['mongo']['write_j']
+
+    """
         Return the maximum amount of time (in seconds) we can allow a lock to be set on a file without any operation on it. If the timeout
         happens, we release the lock (to avoid locking file eternity if there is a problem).
         Value <= 0 means infinity.
@@ -86,6 +100,24 @@ class Configuration:
         if self.conf['cache']['max_elements'] <= 0:
             return 0
         return self.conf['cache']['max_elements']
+
+    """ 
+        Return the maximum amount of time (in seconds) we can keep the data cache for a file. Only used for the data 
+        themselves, so should not be too big.
+        Value <= 0 means disabled.
+    """
+    def data_cache_timeout(self):
+        if self.conf['data_cache']['timeout_s'] <= 0:
+            return 0
+        return self.conf['data_cache']['timeout_s']
+
+    """
+        Return the maximum number of entries we can keep in the data cache.
+    """
+    def data_cache_max_elements(self):
+        if self.conf['data_cache']['max_elements'] <= 0:
+            return 0
+        return self.conf['data_cache']['max_elements']
 
     """
         Return the hostname of the current server

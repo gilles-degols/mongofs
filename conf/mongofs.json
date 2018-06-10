@@ -4,11 +4,17 @@
     "database": "mongofs",
     "prefix": "mongofs_",
     "access_attempt_s": 6,
-    "chunk_size": 15728640
+    "chunk_size": 15728640,
+    "write_acknowledgement": 1,
+    "write_j": false
   },
   "cache": {
     "timeout_s": 5,
     "max_elements": 10000
+  },
+  "data_cache": {
+    "timeout_s": 2,
+    "max_elements": 50
   },
   "development": false,
   "host": "localhost",

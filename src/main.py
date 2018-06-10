@@ -138,7 +138,7 @@ class MongoFS(LoggingMixIn, Operations):
         Write data to a file, from a specific offset. Returns the written data size
     """
     def write(self, path, data, offset, fh):
-        file = self.mongo.get_generic_file(filepath=path) # Takes 50% of the time, TODO: reduce time
+        file = self.mongo.get_generic_file(filepath=path)
         file.add_data(data=data, offset=offset)
         return len(data)
 
@@ -232,7 +232,7 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def statfs(self, path):
         print('Call statfs for '+str(path)+'...')
-        return dict(f_bsize=65536, f_blocks=65536, f_bavail=65536)
+        return dict(f_bsize=65536*8, f_frsize=65536*8, f_blocks=65536*8, f_bavail=65536)
 
     """
         Flush data to MongoDB

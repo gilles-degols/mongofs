@@ -210,4 +210,4 @@ class GenericFile:
     """
     @staticmethod
     def size_to_blocks(length):
-        return int(ceil(length / 65536))
+        return int(ceil(length / (65536*8)))
