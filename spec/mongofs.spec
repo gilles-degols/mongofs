@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 
 Name:   mongofs
-Version:    1.0.0
+Version:    1.1.0
 Release:    0
 Summary:    Mount MongoDB as local storage
 Group:  Gilles Degols
@@ -12,7 +12,7 @@ Requires:   fuse-libs >= 2.9.2-10
 Requires:   python36u >= 3.6.5-1
 Requires(pre): shadow-utils >= 4.1.5.1-24
 BuildRequires:  dos2unix >= 6.0.3-7
-Source0:    mongofs-1.0.0.tar.gz
+Source0:    mongofs-1.1.0.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildArch:	noarch
@@ -59,5 +59,9 @@ rm -rf $RPM_BUILD_ROOT
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Sun Jun 10 2018 Gilles Degols - 1.1.0-0
+- Fix handling of big files
+- Increase write/read speed by a factor 10
+
 * Fri Jun 01 2018 Gilles Degols - 1.0.0-0
 - First release with almost every functionality from FUSE / fusepy

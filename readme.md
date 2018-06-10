@@ -110,6 +110,12 @@ rmdir /mnt/data
 
 5. Create a new release
 
+Add a tag for your version, and push it to the remote Git repository.
+```
+git tag -a v1.1.0 -m "Version 1.1.0"
+git push origin v1.1.0
+```
+
 Set up your environment:
 ```
 yum install -y rpm-build
@@ -118,9 +124,9 @@ mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
 Generate a new archive containing all the sources in Github, in the appropriate directory. Then, generate the rpm.
 ```
-cp -r mongofs mongofs-1.0.0
-tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.0.0.tar.gz mongofs-1.0.0
-QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs/spec/mongofs.spec
+cp -r mongofs mongofs-1.1.0
+tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.1.0.tar.gz mongofs-1.1.0
+QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs-1.1.0/spec/mongofs.spec
 ```
 
 6. Benchmarks
