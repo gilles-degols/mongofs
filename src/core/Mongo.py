@@ -314,19 +314,21 @@ class Mongo:
         # The code above was only to update a document, we might want to add new chunks
         if len(data) > 0:
             remaining_chunks = int(ceil(len(data) / chunk_size))
+            chunks = []
             for i in range(0, remaining_chunks):
                 chunk = {
                     "files_id": file._id,
                     "data": data[0:chunk_size],
                     "n": total_chunks
                 }
-                Mongo.cache.insert_one(self.chunks_coll, chunk)
+                chunks.append(chunk)
 
                 # We have written a part of what we wanted, we only the keep the remaining
                 data = data[chunk_size:]
 
                 # Next entry
                 total_chunks += 1
+            Mongo.cache.insert_many(self.chunks_coll, chunks)
 
         # We update the total length and that's it
         Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size,'metadata.st_blocks':GenericFile.size_to_blocks(total_size)}})
@@ -363,7 +365,7 @@ class Mongo:
     def flush_data_to_write(self, file):
         key = str(file.directory_id) + '/' + file.filename
         if key in self.data_cache:
-            self.add_data(file=file, data=bytes(self.data_cache[key]['data']), offset=self.data_cache[key]['offset'],use_cache=False)
+            self.add_data(file=file, data=bytes(self.data_cache[key]['data']), offset=self.data_cache[key]['offset'], use_cache=False)
             del self.data_cache[key]
         return True
 

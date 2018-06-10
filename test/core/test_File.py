@@ -18,6 +18,7 @@ class TestGenericFile(unittest.TestCase):
         Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
         self.mongo = Mongo()
         GenericFile.mongo = self.mongo
+        GenericFile.configuration = Configuration()
         self.utils = Utils(mongo=self.mongo)
         self.utils.load_files()
 

@@ -3,7 +3,8 @@
     "hosts": ["127.0.0.1:27017"],
     "database": "mongofsTests",
     "prefix": "mongofsTests_",
-    "access_attempt_s": 6
+    "access_attempt_s": 6,
+    "chunk_size": 262144
   },
   "cache": {
     "timeout_s": 2,

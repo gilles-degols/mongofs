@@ -30,6 +30,7 @@ class MongoFS(LoggingMixIn, Operations):
 
         # Additional setup
         GenericFile.mongo = self.mongo
+        GenericFile.configuration = self.configuration
 
         if self.configuration.is_development():
             # START DEBUG ONLY - Drop the old information from MongoDB
@@ -137,7 +138,7 @@ class MongoFS(LoggingMixIn, Operations):
         Write data to a file, from a specific offset. Returns the written data size
     """
     def write(self, path, data, offset, fh):
-        file = self.mongo.get_generic_file(filepath=path)
+        file = self.mongo.get_generic_file(filepath=path) # Takes 50% of the time, TODO: reduce time
         file.add_data(data=data, offset=offset)
         return len(data)
 

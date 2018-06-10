@@ -98,3 +98,12 @@ class Configuration:
     """
     def is_development(self):
         return self.conf['development']
+
+    """
+        The chunk size in gridfs. Value must be between 1 and 15MB maximum (to allow overhead of other fields)
+    """
+    def chunk_size(self):
+        chunk_size = self.conf['mongo']['chunk_size']
+        if chunk_size < 1 or chunk_size > 15*1024*1024:
+            raise ValueError('Invalid chunk size, must be between 1 and '+str(15*1024*1024)+' bytes.')
+        return chunk_size

@@ -34,6 +34,7 @@ class GenericFile:
 
     # Link to the mongo instance, created at startup
     mongo = None
+    configuration = None
 
     """
         We can create a GenericFile instance from a raw json only.
@@ -122,6 +123,7 @@ class GenericFile:
                 'st_mtime': dt,
                 'st_atime': dt
             },
+            'chunkSize': GenericFile.mongo.configuration.chunk_size(),# gridfs field name, we need to keep it that way
             'length': 0
         }
 

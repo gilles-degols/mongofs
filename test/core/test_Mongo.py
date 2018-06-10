@@ -17,6 +17,7 @@ class TestMongo(unittest.TestCase):
         Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
         self.obj = Mongo()
         GenericFile.mongo = self.obj
+        GenericFile.configuration = Configuration()
         self.utils = Utils(mongo=self.obj)
         self.utils.load_files()
 

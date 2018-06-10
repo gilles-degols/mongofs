@@ -190,6 +190,13 @@ class MongoCache:
     def insert_one(self, coll, document):
         return self.database[coll].insert_one(document)
 
+    """
+        A simple insert_many
+    """
+    @retry_connection
+    def insert_many(self, coll, documents):
+        return self.database[coll].insert_many(documents, ordered=False, bypass_document_validation=True)
+
     """ 
         A simple delete_many
     """
