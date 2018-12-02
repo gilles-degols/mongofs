@@ -1,8 +1,10 @@
 #!/usr/lib/mongofs/environment/bin/python3.6
-import os
-from stat import S_IFDIR, S_IFLNK, S_IFREG
+import errno
+from stat import S_IFDIR, S_IFLNK, S_IFREG, S_ISGID
 from math import ceil
 import time
+
+from fuse import FuseOSError
 
 """
     Interface between the MongoDB structure of a file and the file we need to provide to fusepy.
@@ -32,6 +34,10 @@ class GenericFile:
     DIRECTORY_TYPE = 2
     SYMBOLIC_LINK_TYPE = 3
 
+    EXECUTE_RIGHTS = 0o1
+    WRITE_RIGHTS = 0o2
+    READ_RIGHTS = 0o4
+
     # Link to the mongo instance, created at startup
     mongo = None
     configuration = None
@@ -60,6 +66,9 @@ class GenericFile:
         This method will not work for a new generic-file, it must be created by new_generic_file.
     """
     def basic_save(self):
+        if not GenericFile.has_user_access_right(self, GenericFile.WRITE_RIGHTS):
+            raise FuseOSError(errno.EACCES)
+
         GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs)
 
     """
@@ -84,6 +93,7 @@ class GenericFile:
         Rename a generic file to another filepath
     """
     def rename_to(self, initial_filepath, destination_filepath):
+
         GenericFile.mongo.rename_generic_file_to(generic_file=self, initial_filepath=initial_filepath, destination_filepath=destination_filepath)
         # We update the related filename and directory
         self.filename = destination_filepath.split('/')[-1]
@@ -101,18 +111,34 @@ class GenericFile:
     """
     @staticmethod
     def new_generic_file(filepath, mode, file_type, target=None):
-        directory_id = GenericFile.get_directory_id(filepath=filepath)
+        directory_id = None
 
         if not GenericFile.is_generic_filepath_available(filepath=filepath):
-            print('GenericFile not available for '+filepath+', we do nothing.')
-            return None
+            print('GenericFile not available for '+filepath)
+            raise FuseOSError(errno.ENOENT)
+
+        current_user = GenericFile.mongo.current_user()
+        uid = current_user['uid']
+        gid = current_user['gid']
 
         if filepath != '/':
-            GenericFile.mongo.add_nlink_directory(directory_id=directory_id, value=1)
+            directory = GenericFile.get_directory(filepath=filepath)
+            directory_id = directory._id
+
+            if not GenericFile.has_user_access_right(directory, GenericFile.WRITE_RIGHTS, current_user):
+                print('No rights to write on folder ' + directory.filename)
+                raise FuseOSError(errno.EACCES)
+
+            # check setgid bit. If set, give directory group to the created file
+            if directory.metadata['st_mode'] & S_ISGID == 0:
+                gid = directory.metadata['st_gid']
+
+            GenericFile.mongo.add_nlink_directory(directory_id=directory._id, value=1)
 
         # Basic structure of the document to create in MongoDB
         filename = filepath.split('/')[-1]
         dt = time.time()
+
         struct = {
             'directory_id': directory_id,
             'filename': filename,
@@ -121,7 +147,9 @@ class GenericFile:
                 'st_size': 0,
                 'st_ctime': dt,
                 'st_mtime': dt,
-                'st_atime': dt
+                'st_atime': dt,
+                'st_uid': uid,
+                'st_gid': gid,
             },
             'chunkSize': GenericFile.mongo.configuration.chunk_size(),# gridfs field name, we need to keep it that way
             'length': 0
@@ -174,13 +202,21 @@ class GenericFile:
         return directory
 
     """
+        Get the directory document for the given filepath.
+        For the "/" filename, it will return None
+    """
+    @staticmethod
+    def get_directory(filepath):
+        directory = GenericFile.get_directory_name(filepath=filepath)
+        return GenericFile.mongo.get_generic_file(filepath=directory)
+
+    """
         Get the directory _id for the given filepath. Return a {$oid: "...."}.
         For the "/" filename, it will return None
     """
     @staticmethod
     def get_directory_id(filepath):
-        directory = GenericFile.get_directory_name(filepath=filepath)
-        dir = GenericFile.mongo.get_generic_file(filepath=directory)
+        dir = GenericFile.get_directory(filepath=filepath)
         if dir is None:
             return None
         return dir._id
@@ -204,6 +240,28 @@ class GenericFile:
             return False
 
         return True
+
+    @staticmethod
+    def has_user_access_right(file, rights, current_user=None):
+        if current_user is None:
+            current_user = GenericFile.mongo.current_user()
+
+        if current_user['uid'] == 0:
+            return True
+
+        expected_rights = rights
+
+        if file.metadata['st_uid'] == current_user['uid']:
+            expected_rights |= rights << 6
+
+        try:
+            current_user['groups'].index(file.metadata['st_gid'])
+        except ValueError:
+            "Do nothing"
+        else:
+            expected_rights |= rights << 3
+
+        return file.metadata['st_mode'] & expected_rights > 0
 
     """
         Return the appropriate number of blocks for a given file size

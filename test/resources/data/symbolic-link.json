@@ -9,7 +9,9 @@
         "st_mtime" : 1527342349.4137955,
         "st_atime" : 1527342349.4137955,
         "st_nlink" : 1,
-        "st_mode" : 41471
+        "st_mode" : 41471,
+        "st_uid": 0,
+        "st_gid": 0
     },
     "length" : 0,
     "target" : "/mnt/data/truc",

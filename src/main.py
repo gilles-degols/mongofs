@@ -2,16 +2,13 @@
 
 import logging
 import time
-import os
+import os, errno
 
 from sys import argv, exit
-from errno import ENOENT
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from src.core.Configuration import Configuration
 from src.core.GenericFile import GenericFile
-from src.core.File import File
-from src.core.SymbolicLink import SymbolicLink
 from src.core.Mongo import Mongo
 
 """
@@ -42,7 +39,7 @@ class MongoFS(LoggingMixIn, Operations):
     """
         Create a file and returns a "file descriptor", which is in fact, simply the _id.
     """
-    def create(self, path, mode):
+    def create(self, path, mode, fi=None):
         file = GenericFile.new_generic_file(filepath=path, mode=mode, file_type=GenericFile.FILE_TYPE)
         return file.file_descriptor
 
@@ -155,7 +152,7 @@ class MongoFS(LoggingMixIn, Operations):
     def getattr(self, path, fh=None):
         gf = self.mongo.get_generic_file(filepath=path)
         if gf is None:
-            raise FuseOSError(ENOENT)
+            raise FuseOSError(errno.ENOENT)
 
         return gf.metadata
 
@@ -205,8 +202,7 @@ class MongoFS(LoggingMixIn, Operations):
             del gf.attrs[name]
             gf.basic_save()
         else:
-            # Should return ENOATTR
-            pass
+            raise FuseOSError(errno.ENOATTR)
 
     """
         Update the access and update time for a given path

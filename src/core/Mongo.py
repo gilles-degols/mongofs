@@ -1,10 +1,12 @@
 #!/usr/lib/mongofs/environment/bin/python3.6
 import errno
+import grp
+import pwd
 from math import floor, ceil
-from errno import ENOENT, EDEADLOCK
+from errno import EDEADLOCK
 import time
 import pymongo
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
+from fuse import FuseOSError, fuse_get_context
 
 from src.core.Configuration import Configuration
 from src.core.MongoCache import MongoCache
@@ -27,18 +29,22 @@ class Mongo:
 
         # Collection name
         self.gridfs_coll = Mongo.configuration.mongo_prefix() + 'files'
-        self.files_coll =  Mongo.configuration.mongo_prefix() + 'files.files'
-        self.chunks_coll =  Mongo.configuration.mongo_prefix() + 'files.chunks'
-
-        # We need to be sure to have the top folder created in MongoDB
-        GenericFile.mongo = self
-        GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+        self.files_coll = Mongo.configuration.mongo_prefix() + 'files.files'
+        self.chunks_coll = Mongo.configuration.mongo_prefix() + 'files.chunks'
 
         # Create the initial indexes
         self.create_indexes()
 
         # Temporary cache for the file data
         self.data_cache = {}
+
+        # Temporary cache for user groups
+        self.user_groups_cache = {}
+
+        # We need to be sure to have the top folder created in MongoDB
+        GenericFile.mongo = self
+        if GenericFile.is_generic_filepath_available(filepath='/'):
+            GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
 
     """
         Create various indexes if they do not exist. Only called at startup
@@ -66,10 +72,22 @@ class Mongo:
     """
         Some information about the current user.
     """
-    @staticmethod
-    def current_user():
+    def current_user(self):
         raw = fuse_get_context()
-        return {'uid':raw[0],'gid':raw[1],'pid':raw[2]}
+        uid = raw[0]
+        gid = raw[1]
+
+        if not uid in self.user_groups_cache:
+            pw_uid = pwd.getpwuid(uid)
+            groups = [g.gr_gid for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
+
+            try:
+                groups.index(gid)
+            except ValueError:
+                groups.append(gid)
+            self.user_groups_cache[uid] = groups
+
+        return {'uid':uid,'gid':gid,'pid':raw[2],'groups':self.user_groups_cache[uid]}
 
     """
         Give the appropriate lock id containing:
@@ -77,9 +95,8 @@ class Mongo:
             pid
             hostname            
     """
-    @staticmethod
-    def lock_id(filepath):
-        lock_id = filepath + ';' + str(Mongo.current_user()['pid']) + ';' + str(Mongo.configuration.hostname())
+    def lock_id(self, filepath):
+        lock_id = filepath + ';' + str(self.current_user()['pid']) + ';' + str(Mongo.configuration.hostname())
         return lock_id
 
     """
@@ -105,6 +122,9 @@ class Mongo:
         Remove a generic file. No need to verify if the file already exists, the check is done by FUSE.
     """
     def remove_generic_file(self, generic_file):
+        if not GenericFile.has_user_access_right(generic_file, GenericFile.WRITE_RIGHTS):
+            raise FuseOSError(errno.EACCES)
+
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
         # be sure the directory is empty.
         if generic_file.is_dir():
@@ -123,6 +143,9 @@ class Mongo:
     """
     def list_generic_files_in_directory(self, filepath):
         dir = self.get_generic_file(filepath=filepath)
+        if not GenericFile.has_user_access_right(dir, GenericFile.EXECUTE_RIGHTS):
+            raise FuseOSError(errno.EACCES)
+
         files = []
         for elem in Mongo.cache.find(self.files_coll, {'directory_id':dir._id}):
             files.append(Mongo.load_generic_file(elem))
@@ -148,7 +171,7 @@ class Mongo:
         gf = Mongo.LOCKED_FILE
 
         if take_lock is True:
-            lock_id = Mongo.lock_id(filepath=filepath)
+            lock_id = self.lock_id(filepath=filepath)
         else:
             lock_id = None
 
@@ -182,7 +205,7 @@ class Mongo:
         dt_timeout = dt + Mongo.configuration.lock_timeout()
 
         # The same process could be the one having created the lock, so we need to let him have access to the file
-        current_process_lock = Mongo.lock_id(filepath=filepath)
+        current_process_lock = self.lock_id(filepath=filepath)
         master_process_lock = Mongo.master_lock_id(filepath=filepath)
         if lock is not None:
             gf = Mongo.cache.find_one_and_update(self.files_coll,
@@ -399,13 +422,18 @@ class Mongo:
         # There is no need to verify if the destination directory exists, and if there is not already a file with the same name,
         # as FUSE will automatically verify those conditions before calling our implementation of file moving.
 
+        destination_directory = GenericFile.get_directory(filepath=destination_filepath)
+        if not GenericFile.has_user_access_right(destination_directory, GenericFile.WRITE_RIGHTS):
+            print('No rights to write on folder ' + destination_directory.filename)
+            raise FuseOSError(errno.EACCES)
+
         # First we decrease the number of nlink in the directory above (even if we might stay in the same repository
         # at the end, that's not a big deal)
         initial_directory_id = GenericFile.get_directory_id(filepath=initial_filepath)
         self.add_nlink_directory(directory_id=initial_directory_id, value=-1)
 
         # We rename it
-        destination_directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
+        destination_directory_id = destination_directory._id
         dest_filename = destination_filepath.split('/')[-1]
         Mongo.cache.find_one_and_update(self.files_coll, {'_id':generic_file._id},{'$set':{'directory_id':destination_directory_id,'filename':dest_filename}})
 
@@ -416,7 +444,7 @@ class Mongo:
         Remove a lock to a generic file (only if we are owner of it). We do not care about the lock type. 
     """
     def unlock_generic_file(self, filepath, generic_file):
-        lock_id = Mongo.lock_id(filepath=filepath)
+        lock_id = self.lock_id(filepath=filepath)
         master_lock_id = Mongo.master_lock_id(filepath=filepath)
         if 'id' not in generic_file.lock or lock_id not in [master_lock_id, generic_file.lock['id']]:
             print('Trying to release a non-existing lock, or one that we do not own. We do nothing.')

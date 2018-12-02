@@ -9,7 +9,9 @@
         "st_mtime" : 1527342333.3938396,
         "st_atime" : 1527342333.3938396,
         "st_nlink" : 1,
-        "st_mode" : 33188
+        "st_mode" : 33188,
+        "st_uid": 0,
+        "st_gid": 0
     },
     "length" : 39,
     "md5" : "d41d8cd98f00b204e9800998ecf8427e",
