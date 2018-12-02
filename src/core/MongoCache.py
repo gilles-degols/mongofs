@@ -1,13 +1,8 @@
 #!/usr/lib/mongofs/environment/bin/python3.6
-import errno
-from math import floor, ceil
-from errno import ENOENT, EDEADLOCK
 import os
-import signal
 import subprocess
 import time
 from expiringdict import ExpiringDict
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 
 from pymongo.errors import PyMongoError
 from pymongo import MongoClient
@@ -16,7 +11,6 @@ from src.core.Configuration import Configuration
 from pymongo.collection import ReturnDocument
 
 from functools import wraps
-import copy
 
 """
     Custom decorator to easily handle a MongoDB disconnection.
@@ -198,11 +192,11 @@ class MongoCache:
         if coll.endswith('.files') and result is not None:
             # We directly update the document in the cache.
             key = str(result['directory_id']) + '/' + str(result['filename'])
+            self.reset_cache()
             MongoCache.cache[key] = result
         elif coll.endswith('.chunks') and result is not None:
             # We simply reset the data cache to avoid complicating things if we update a document.
-            MongoCache.data_cache = ExpiringDict(max_len=MongoCache.configuration.data_cache_max_elements(),
-                                                 max_age_seconds=MongoCache.configuration.data_cache_timeout())
+            self.reset_cache()
 
         return result
 
@@ -241,6 +235,7 @@ class MongoCache:
     """
     @retry_connection
     def gridfs_delete(self, _id):
+        self.reset_cache()
         return self.gridfs.delete(_id)
 
     """

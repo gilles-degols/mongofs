@@ -93,6 +93,9 @@ class GenericFile:
         Rename a generic file to another filepath
     """
     def rename_to(self, initial_filepath, destination_filepath):
+        existing_file = GenericFile.mongo.get_generic_file(destination_filepath)
+        if existing_file is not None:
+            GenericFile.mongo.remove_generic_file(existing_file)
 
         GenericFile.mongo.rename_generic_file_to(generic_file=self, initial_filepath=initial_filepath, destination_filepath=destination_filepath)
         # We update the related filename and directory
