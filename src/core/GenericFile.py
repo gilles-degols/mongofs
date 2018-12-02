@@ -54,7 +54,10 @@ class GenericFile:
         self.chunkSize = json.get('chunkSize', None)
         self.directory_id = json['directory_id']
         self.generic_file_type = json['generic_file_type']
+        self.host = json['host']
         self.metadata = json['metadata']
+        self.gname = json['gname']
+        self.uname = json['uname']
         self.attrs = json.get('attrs',{})
         self.lock = json.get('lock',{})
         self.length = json['length']
@@ -69,7 +72,7 @@ class GenericFile:
         if not GenericFile.has_user_access_right(self, GenericFile.WRITE_RIGHTS):
             raise FuseOSError(errno.EACCES)
 
-        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs)
+        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs, host=self.host, uname=self.uname, gname=self.gname)
 
     """
         Indicates if the current GenericFile is in fact a directory
@@ -154,7 +157,10 @@ class GenericFile:
                 'st_uid': uid,
                 'st_gid': gid,
             },
-            'chunkSize': GenericFile.mongo.configuration.chunk_size(),# gridfs field name, we need to keep it that way
+            'uname': current_user['uname'],
+            'gname': GenericFile.mongo.get_groupname(gid),
+            'host': GenericFile.mongo.configuration.hostname(),
+            'chunkSize': GenericFile.mongo.configuration.chunk_size(),  # gridfs field name, we need to keep it that way
             'length': 0
         }
 
@@ -254,11 +260,14 @@ class GenericFile:
 
         expected_rights = rights
 
-        if file.metadata['st_uid'] == current_user['uid']:
+        if file.metadata['st_uid'] == current_user['uid'] or (file.host != GenericFile.configuration.hostname() and file.uname == current_user['uname']):
             expected_rights |= rights << 6
 
         try:
-            current_user['groups'].index(file.metadata['st_gid'])
+            if file.host == GenericFile.configuration.hostname():
+                current_user['gids'].index(file.metadata['st_gid'])
+            else:
+                current_user['gnames'].index(file.gname)
         except ValueError:
             "Do nothing"
         else:
