@@ -154,7 +154,16 @@ class MongoFS(LoggingMixIn, Operations):
         if gf is None:
             raise FuseOSError(errno.ENOENT)
 
-        return gf.metadata
+        metadata = gf.metadata
+        if gf.host != self.configuration.hostname():
+            uid = self.mongo.get_userid(gf.uname)
+            if uid is not None:
+                metadata['st_uid'] = uid
+
+            gid = self.mongo.get_groupid(gf.gname)
+            if gid is not None:
+                metadata['st_gid'] = gid
+        return metadata
 
     """
         Set permissions to a given path
@@ -171,8 +180,11 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def chown(self, path, uid, gid):
         gf = self.mongo.get_generic_file(filepath=path)
+        gf.host = self.configuration.hostname()
         gf.metadata['st_uid'] = uid
         gf.metadata['st_gid'] = gid
+        gf.uname = self.mongo.get_username(uid)
+        gf.gname = self.mongo.get_groupname(gid)
         gf.basic_save()
 
     """

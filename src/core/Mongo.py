@@ -6,6 +6,7 @@ from math import floor, ceil
 from errno import EDEADLOCK
 import time
 import pymongo
+from expiringdict import ExpiringDict
 from fuse import FuseOSError, fuse_get_context
 
 from src.core.Configuration import Configuration
@@ -38,8 +39,11 @@ class Mongo:
         # Temporary cache for the file data
         self.data_cache = {}
 
-        # Temporary cache for user groups
-        self.user_groups_cache = {}
+        # Temporary cache for user information
+        self.user_cache = ExpiringDict(max_len=1000, max_age_seconds=2)
+
+        # Temporary cache for group information
+        self.group_cache = ExpiringDict(max_len=1000, max_age_seconds=2)
 
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
@@ -77,17 +81,69 @@ class Mongo:
         uid = raw[0]
         gid = raw[1]
 
-        if not uid in self.user_groups_cache:
+        if not uid in self.user_cache:
             pw_uid = pwd.getpwuid(uid)
-            groups = [g.gr_gid for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
+            gids = [g.gr_gid for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
+            gnames = [g.gr_name for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
 
             try:
-                groups.index(gid)
+                gids.index(gid)
             except ValueError:
-                groups.append(gid)
-            self.user_groups_cache[uid] = groups
+                gids.append(gid)
+            self.user_cache[uid] = {'uname': pw_uid.pw_name, 'gids': gids, 'gnames': gnames}
 
-        return {'uid':uid,'gid':gid,'pid':raw[2],'groups':self.user_groups_cache[uid]}
+        user_info = self.user_cache[uid]
+        return {'uid': uid, 'gid': gid, 'pid': raw[2], 'uname': user_info['uname'], 'gids': user_info['gids'], 'gnames': user_info['gnames']}
+
+    """
+        Get user name name for a name id
+    """
+    def get_username(self, uid):
+        if not uid in self.user_cache:
+            try:
+                return pwd.getpwuid(uid).pw_name
+            except KeyError:
+                return None
+
+        return self.user_cache[uid]['uname']
+
+    """
+        Get user name name for a name id
+    """
+    def get_userid(self, uname):
+        for uid in self.user_cache:
+            if self.user_cache[uid]['uname'] == uname:
+                return uid
+        try:
+            return pwd.getpwnam(uname).pw_uid
+        except KeyError:
+            return None
+
+    """
+        Get group name for a group id
+    """
+    def get_groupname(self, gid):
+        if not gid in self.group_cache:
+            try:
+                self.group_cache[gid] = grp.getgrgid(gid).gr_name
+            except KeyError:
+                return None
+        return self.group_cache[gid]
+
+    """
+        Get group id for a group name
+    """
+    def get_groupid(self, gname):
+        for gid in self.group_cache:
+            if self.group_cache[gid] == gname:
+                return gid
+
+        try:
+            gid = grp.getgrnam(gname).gr_gid
+            self.group_cache[gid] = gname
+            return gid
+        except KeyError:
+            return None
 
     """
         Give the appropriate lock id containing:
@@ -128,7 +184,7 @@ class Mongo:
         # We cannot directly remove every sub-file in the directory (permissions check to do, ...), but we need to
         # be sure the directory is empty.
         if generic_file.is_dir():
-            if Mongo.cache.find(self.files_coll, {'directory_id':generic_file._id}).count() != 0:
+            if Mongo.cache.find(self.files_coll, {'directory_id': generic_file._id}).count() != 0:
                 raise FuseOSError(errno.ENOTEMPTY)
 
         # First we delete the file (metadata + chunks)
@@ -462,8 +518,8 @@ class Mongo:
     """
         Update some arbitrary fields in the general "files" object
     """
-    def basic_save(self, generic_file, metadata, attrs):
-        Mongo.cache.find_one_and_update(self.files_coll, {'_id':generic_file._id},{'$set':{'metadata':metadata,'attrs':attrs}})
+    def basic_save(self, generic_file, metadata, attrs, host, uname, gname):
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id': generic_file._id}, {'$set': { 'metadata':metadata, 'attrs':attrs, 'host': host, 'gname': gname, 'uname': uname}})
 
     """
         Clean the database, only for development purposes
