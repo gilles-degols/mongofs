@@ -9,9 +9,9 @@ Group:  Gilles Degols
 License:    MIT
 Requires:   fuse >= 2.9.2-10
 Requires:   fuse-libs >= 2.9.2-10
-Requires:   python36u >= 3.6.5-1
 Requires(pre): shadow-utils >= 4.1.5.1-24
 BuildRequires:  dos2unix >= 6.0.3-7
+BuildRequires:  python34 >= 3.4.9-1.el7, python34-pip >= 8.12-6.el7
 Source0:    mongofs-1.1.0.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -43,10 +43,10 @@ install -D -m 0644 run $RPM_BUILD_ROOT/usr/lib/mongofs/run
 /usr/bin/ln -s /usr/lib/mongofs/run $RPM_BUILD_ROOT/usr/bin/mongofs-mount
 chmod +x $RPM_BUILD_ROOT/usr/lib/mongofs/run
 
-/usr/bin/python3.6 -m venv $RPM_BUILD_ROOT/usr/lib/mongofs/environment
+/usr/bin/python3 -m venv $RPM_BUILD_ROOT/usr/lib/mongofs/environment
 source $RPM_BUILD_ROOT/usr/lib/mongofs/environment/bin/activate
-python3.6 -m pip install --upgrade pip
-python3.6 -m pip install -r requirements.txt
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
 deactivate
 
 %clean
