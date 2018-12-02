@@ -247,15 +247,19 @@ if __name__ == '__main__':
         configuration_filepath = argv[2]
         Configuration.FILEPATH = configuration_filepath
 
+    mounting_point = str(argv[1])
+    if not mounting_point.startswith('/'):
+        mounting_point = os.getcwd() + '/' + mounting_point
+
     # If the previous mount failed, we need to be sure to umount it, otherwise you will not be able to mount anymore
-    Configuration.mounting_point = argv[1]
-    os.system('fusermount -u ' + str(argv[1])+' &>/dev/null')
+    Configuration.mounting_point = mounting_point
+    os.system('fusermount -u ' + mounting_point +' &>/dev/null')
 
     configuration = Configuration()
     if configuration.is_development():
-        #logging.basicConfig(level=logging.DEBUG)
-        logging.basicConfig(level=logging.ERROR)
-        fuse = FUSE(MongoFS(), argv[1], foreground=True, nothreads=True, allow_other=True)
+        logging.basicConfig(level=logging.DEBUG)
+        # logging.basicConfig(level=logging.ERROR)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=True)
     else:
         logging.basicConfig(level=logging.ERROR)
-        fuse = FUSE(MongoFS(), argv[1], foreground=False, nothreads=False, allow_other=True)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=False, nothreads=False, allow_other=True)
