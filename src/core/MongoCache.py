@@ -1,4 +1,4 @@
-#!/usr/lib/mongofs/environment/bin/python3.6
+#!/usr/lib/mongofs/environment/bin/python
 import os
 import subprocess
 import time

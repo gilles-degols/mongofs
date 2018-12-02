@@ -3,7 +3,7 @@ Tested Operating Systems: Centos 7
 
 Tested MongoDB: 3.6. Should be able to run easily since 3.0. Works with sharding and replica set.
 
-Tested Python version: 3.6.
+Tested Python version: 3.4/3.6.
 
 ### General information
 Mount a Mongo database as a FUSE file system. Purpose of this implementation is the following:
@@ -45,7 +45,6 @@ What is not possible or recommended with MongoFS:
 
 1. Install the different packages
 ```
-yum -y install https://centos7.iuscommunity.org/ius-release.rpm
 yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.0.0/mongofs-1.0.0-0.noarch.rpm
 ```
 
@@ -64,25 +63,24 @@ sudo mongofs-mount /mnt/data
 We assume that you already have a MongoDB installation, otherwise, follow the procedure described here: https://docs.mongodb.com/manual/installation/
 ```
 git clone git@github.com:gilles-degols/mongofs.git
-yum -y install https://centos7.iuscommunity.org/ius-release.rpm
 yum -y install python36u fuse fuse-libs
-python3.6 -m ensurepip --default-pip
-python3.6 -m pip install --upgrade pip
-python3.6 -m pip remove fuse # Otherwise conflicts can happen with fusepy
-python3.6 -m pip install  -r requirements.txt
+python3 -m ensurepip --default-pip
+python3 -m pip install --upgrade pip
+python3 -m pip remove fuse # Otherwise conflicts can happen with fusepy
+python3 -m pip install  -r requirements.txt
 ```
 
 2. Run the tests
 
 ```
 # Run all tests
-python3.6 -m unittest discover -v
+python3 -m unittest discover -v
 
 # Run all tests of a class:
-python3.6 -m unittest -v test.core.test_GenericFile
+python3 -m unittest -v test.core.test_GenericFile
 
 # Run one specific test
-python3.6 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_save
+python3 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_save
 ```
 
 3. Mount the file system in a temporary directory
@@ -91,10 +89,10 @@ By default the configuration file is in /etc/mongofs/mongofs.json. You can give 
 directly, as second argument.
 ```
 mkdir -p /mnt/data
-python3.6 -m src.main /mnt/data
+python3 -m src.main /mnt/data
 
 # With a specific configuration filepath (absolute or relative)
-python3.6 -m src.main /mnt/data conf/mongofs.json
+python3 -m src.main /mnt/data conf/mongofs.json
 ```
 
 4. Troubleshooting
@@ -135,7 +133,7 @@ If you want to test the performance of MongoFS versus your file system, you can 
 Benchmarking is a difficult subject, so be careful when you compare numbers.
 Be aware that FUSE + fusepy (library used in mongofs) is in fact the slowest part of writing, and unfortunately we cannot improve the performance a lot more until it is improved on their side.
 ```
-python3.6 -m src.main /mnt/data conf/mongofs.json
+python3 -m src.main /mnt/data conf/mongofs.json
 
 # Test local file system
 yes "a" | dd of=output.dat bs=4k count=2500000 iflag=fullblock && time cat output.dat > /dev/null

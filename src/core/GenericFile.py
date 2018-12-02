@@ -1,4 +1,4 @@
-#!/usr/lib/mongofs/environment/bin/python3.6
+#!/usr/lib/mongofs/environment/bin/python
 import errno
 from stat import S_IFDIR, S_IFLNK, S_IFREG, S_ISGID
 from math import ceil

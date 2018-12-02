@@ -1,8 +1,7 @@
 import unittest
-import os
 import subprocess
 import time
-from src.core.Configuration import Configuration
+from collections import namedtuple
 
 """
     The purpose of this class is not to test the main.py directly, but rather do some integration tests with FUSE, to be
@@ -11,7 +10,7 @@ from src.core.Configuration import Configuration
 """
 class TestIntegration(unittest.TestCase):
     TEST_DIRECTORY = '/mnt/mongofs-integration-test'
-    START_COMMAND = 'nohup python3.6 -m src.main '+TEST_DIRECTORY+' test/resources/conf/mongofs.json >/dev/null 2>&1 &'
+    START_COMMAND = 'nohup python3 -m src.main '+TEST_DIRECTORY+' test/resources/conf/mongofs.json >/dev/null 2>&1 &'
 
     def setUp(self):
         commands = [
@@ -23,11 +22,16 @@ class TestIntegration(unittest.TestCase):
         self.execute_background_command(command=TestIntegration.START_COMMAND)
 
     def execute_command(self, command):
-        res = subprocess.run([command], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
-        return res
+        try:
+            res = subprocess.check_output([command], stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+            result = {'returncode': 0, 'stdout': res}
+        except subprocess.CalledProcessError as e:
+            result = {'returncode': e.returncode, 'stdout': e.output}
+
+        return namedtuple("CommandResult", result.keys())(*result.values())
 
     def execute_background_command(self, command):
-        subprocess.run([command], shell=True, stdout=subprocess.PIPE)
+        subprocess.call([command], shell=True, stdout=subprocess.PIPE)
         # We cannot be sure that the file system is directly accessible (it might take a few ms). And we could be trying
         # to read to the local file system instead, so we need to verify if the mounting was correctly done.
         for i in range(0, 10):

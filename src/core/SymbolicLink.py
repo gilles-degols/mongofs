@@ -1,4 +1,4 @@
-#!/usr/lib/mongofs/environment/bin/python3.6
+#!/usr/lib/mongofs/environment/bin/python
 from src.core.GenericFile import GenericFile
 
 class SymbolicLink(GenericFile):
