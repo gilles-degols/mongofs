@@ -1,5 +1,4 @@
 import unittest
-import json
 from bson import json_util
 from fuse import FuseOSError
 
@@ -56,7 +55,7 @@ class TestMongo(unittest.TestCase):
     def test_create_generic_file(self):
         self.utils.insert_file()
         gf = self.utils.files_coll.find_one({'directory_id':self.utils.file.directory_id,'filename':self.utils.file.filename},{'uploadDate':False})
-        self.assertEqual(json_util.dumps(gf), json_util.dumps(self.utils.file_raw))
+        self.assertEqual(json_util.dumps(gf, sort_keys=True), json_util.dumps(self.utils.file_raw, sort_keys=True))
 
     def test_remove_generic_file(self):
         self.utils.insert_file()

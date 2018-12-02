@@ -1,15 +1,8 @@
 import unittest
-import json
-from bson import json_util
-from fuse import FuseOSError
-from stat import S_IFDIR, S_IFLNK, S_IFREG
 
 from src.core.Configuration import Configuration
 from src.core.Mongo import Mongo
 from src.core.GenericFile import GenericFile
-from src.core.File import File
-from src.core.Directory import Directory
-from src.core.SymbolicLink import SymbolicLink
 
 from test.core.Utils import Utils
 
