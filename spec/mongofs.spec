@@ -11,7 +11,7 @@ Requires:   fuse >= 2.9.2-10
 Requires:   fuse-libs >= 2.9.2-10
 Requires(pre): shadow-utils >= 4.1.5.1-24
 BuildRequires:  dos2unix >= 6.0.3-7
-BuildRequires:  python34 >= 3.4.9-1.el7, python34-pip >= 8.12-6.el7
+BuildRequires:  python34 >= 3.4.9-1.el7, python34-pip >= 8.1.2-6.el7
 Source0:    mongofs-1.2.0.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
