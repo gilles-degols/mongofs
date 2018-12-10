@@ -136,8 +136,10 @@ class GenericFile:
                 raise FuseOSError(errno.EACCES)
 
             # check setgid bit. If set, give directory group to the created file
-            if directory.metadata['st_mode'] & S_ISGID == 0:
+            if directory.metadata['st_mode'] & S_ISGID != 0:
                 gid = directory.metadata['st_gid']
+                if file_type == GenericFile.DIRECTORY_TYPE:
+                    mode |= S_ISGID
 
             GenericFile.mongo.add_nlink_directory(directory_id=directory._id, value=1)
 
