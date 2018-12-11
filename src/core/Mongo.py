@@ -81,38 +81,40 @@ class Mongo:
         uid = raw[0]
         gid = raw[1]
 
-        if not uid in self.user_cache:
+        try:
+            user_info = self.user_cache[uid]
+        except KeyError:
             pw_uid = pwd.getpwuid(uid)
-            gids = [g.gr_gid for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
-            gnames = [g.gr_name for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem]
+            gids = [g.gr_gid for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem or pw_uid.pw_name == g.gr_name]
+            gnames = [g.gr_name for g in grp.getgrall() if pw_uid.pw_name in g.gr_mem or pw_uid.pw_name == g.gr_name]
 
             try:
                 gids.index(gid)
             except ValueError:
                 gids.append(gid)
-            self.user_cache[uid] = {'uname': pw_uid.pw_name, 'gids': gids, 'gnames': gnames}
-
-        user_info = self.user_cache[uid]
+            user_info = {'uname': pw_uid.pw_name, 'gids': gids, 'gnames': gnames}
+            self.user_cache[uid] = user_info
         return {'uid': uid, 'gid': gid, 'pid': raw[2], 'uname': user_info['uname'], 'gids': user_info['gids'], 'gnames': user_info['gnames']}
 
     """
         Get user name name for a name id
     """
     def get_username(self, uid):
-        if not uid in self.user_cache:
+        try:
+           return self.user_cache[uid]['uname']
+        except KeyError:
             try:
                 return pwd.getpwuid(uid).pw_name
             except KeyError:
                 return None
 
-        return self.user_cache[uid]['uname']
 
     """
         Get user name name for a name id
     """
     def get_userid(self, uname):
-        for uid in self.user_cache:
-            if self.user_cache[uid]['uname'] == uname:
+        for uid, val in self.user_cache.items():
+            if val['uname'] == uname:
                 return uid
         try:
             return pwd.getpwnam(uname).pw_uid
@@ -123,19 +125,22 @@ class Mongo:
         Get group name for a group id
     """
     def get_groupname(self, gid):
-        if not gid in self.group_cache:
+        try:
+             return self.group_cache[gid]
+        except KeyError:
             try:
-                self.group_cache[gid] = grp.getgrgid(gid).gr_name
+                gname = grp.getgrgid(gid).gr_name
+                self.group_cache[gid] = gname
+                return gname
             except KeyError:
                 return None
-        return self.group_cache[gid]
 
     """
         Get group id for a group name
     """
     def get_groupid(self, gname):
-        for gid in self.group_cache:
-            if self.group_cache[gid] == gname:
+        for gid, name in self.group_cache.items():
+            if name == gname:
                 return gid
 
         try:
