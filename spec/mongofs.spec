@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 
 Name:   mongofs
-Version:    1.2.0
+Version:    1.2.1
 Release:    0
 Summary:    Mount MongoDB as local storage
 Group:  Gilles Degols
@@ -12,7 +12,7 @@ Requires:   fuse-libs >= 2.9.2-10
 Requires(pre): shadow-utils >= 4.1.5.1-24
 BuildRequires:  dos2unix >= 6.0.3-7
 BuildRequires:  python34 >= 3.4.9-1.el7, python34-pip >= 8.1.2-6.el7
-Source0:    mongofs-1.2.0.tar.gz
+Source0:    mongofs-1.2.1.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildArch:	noarch
@@ -59,6 +59,9 @@ rm -rf $RPM_BUILD_ROOT
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Tue Dec 11 2018 Gilles Degols - 1.2.1-0
+- Better handle root users and groups with the same name
+
 * Mon Dec 3 2018 Gilles Degols - 1.2.0-0
 - Better handling of access rights and remove obsolete entries in the cache after file deletion
 
