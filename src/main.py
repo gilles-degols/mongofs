@@ -156,13 +156,15 @@ class MongoFS(LoggingMixIn, Operations):
 
         metadata = gf.metadata
         if gf.host != self.configuration.hostname():
-            uid = self.mongo.get_userid(gf.uname)
-            if uid is not None:
-                metadata['st_uid'] = uid
+            if metadata['st_uid'] != 0
+                uid = self.mongo.get_userid(gf.uname)
+                if uid is not None:
+                    metadata['st_uid'] = uid
 
-            gid = self.mongo.get_groupid(gf.gname)
-            if gid is not None:
-                metadata['st_gid'] = gid
+            if metadata['st_gid'] != 0:
+                gid = self.mongo.get_groupid(gf.gname)
+                if gid is not None:
+                    metadata['st_gid'] = gid
         return metadata
 
     """
