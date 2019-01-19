@@ -45,7 +45,7 @@ What is not possible or recommended with MongoFS:
 
 1. Install the different packages
 ```
-yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.0.0/mongofs-1.0.0-0.noarch.rpm
+yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.2.2/mongofs-1.2.2-0.noarch.rpm
 ```
 
 2. Mount the file system with the default parameters in /etc/mongofs/mongofs.json
@@ -110,8 +110,8 @@ rmdir /mnt/data
 
 Add a tag for your version, and push it to the remote Git repository.
 ```
-git tag -a v1.1.0 -m "Version 1.1.0"
-git push origin v1.1.0
+git tag -a v1.2.2 -m "Version 1.2.2"
+git push origin v1.2.2
 ```
 
 Set up your environment:
@@ -122,9 +122,9 @@ mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
 Generate a new archive containing all the sources in Github, in the appropriate directory. Then, generate the rpm.
 ```
-cp -r mongofs mongofs-1.1.0
-tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.1.0.tar.gz mongofs-1.1.0
-rpmbuild -ba mongofs-1.1.0/spec/mongofs.spec
+cp -r mongofs mongofs-1.2.2
+tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.2.2.tar.gz mongofs-1.2.2
+rpmbuild -ba mongofs-1.2.2/spec/mongofs.spec
 ```
 
 6. Benchmarks
