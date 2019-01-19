@@ -1,7 +1,7 @@
 %define debug_package %{nil}
 %global _python_bytecompile_errors_terminate_build 0
 
-%{!?_release: %define _version 0.2.5 }
+%{!?_release: %define _version 1.2.2 }
 %{!?_release: %define _release 0 }
 # %{!?_src: %define _src %{_version}-%{_release} }
 
@@ -83,6 +83,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Sat Jan 19 2019 Gilles Degols - 1.2.2-0
+- Proper RPM packaging and fix unit tests
+
 * Tue Dec 11 2018 Gilles Degols - 1.2.1-0
 - Better handle root users and groups with the same name
 
