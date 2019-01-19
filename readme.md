@@ -66,7 +66,7 @@ git clone git@github.com:gilles-degols/mongofs.git
 yum -y install python36u fuse fuse-libs
 python3 -m ensurepip --default-pip
 python3 -m pip install --upgrade pip
-python3 -m pip remove fuse # Otherwise conflicts can happen with fusepy
+python3 -m pip uninstall fuse # Otherwise conflicts can happen with fusepy
 python3 -m pip install  -r requirements.txt
 ```
 
@@ -124,7 +124,7 @@ Generate a new archive containing all the sources in Github, in the appropriate 
 ```
 cp -r mongofs mongofs-1.1.0
 tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.1.0.tar.gz mongofs-1.1.0
-QA_SKIP_BUILD_ROOT=1 rpmbuild -ba mongofs-1.1.0/spec/mongofs.spec
+rpmbuild -ba mongofs-1.1.0/spec/mongofs.spec
 ```
 
 6. Benchmarks

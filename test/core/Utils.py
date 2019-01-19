@@ -7,7 +7,7 @@ class Utils:
     def __init__(self, mongo=None):
         if mongo is None:
             Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
-            mongo = Mongo()
+            mongo = Mongo(do_clean_up=True)
 
         self.mongo = mongo
         self.database = self.mongo.cache.database

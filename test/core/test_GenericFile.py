@@ -10,7 +10,7 @@ from test.core.Utils import Utils
 class TestGenericFile(unittest.TestCase):
     def setUp(self):
         Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
-        self.mongo = Mongo()
+        self.mongo = Mongo(do_clean_up=True)
         GenericFile.mongo = self.mongo
         GenericFile.configuration = Configuration()
         self.utils = Utils(mongo=self.mongo)
