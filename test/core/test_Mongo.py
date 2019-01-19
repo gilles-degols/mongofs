@@ -14,7 +14,7 @@ from test.core.Utils import Utils
 class TestMongo(unittest.TestCase):
     def setUp(self):
         Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
-        self.obj = Mongo()
+        self.obj = Mongo(do_clean_up=True)
         GenericFile.mongo = self.obj
         GenericFile.configuration = Configuration()
         self.utils = Utils(mongo=self.obj)
@@ -215,7 +215,7 @@ class TestMongo(unittest.TestCase):
 
     def test_basic_save(self):
         self.utils.insert_file()
-        self.obj.basic_save(generic_file=self.utils.file, metadata={'st_nlink':1}, attrs={'thing':1})
+        self.obj.basic_save(generic_file=self.utils.file, metadata={'st_nlink':1}, attrs={'thing':1}, host=self.utils.file.host, gname=self.utils.file.gname, uname=self.utils.file.uname)
         result = self.utils.files_coll.find_one({'_id':self.utils.file._id})
         self.assertTrue('st_nlink' in result['metadata'] and len(result['metadata']) == 1)
         self.assertTrue('thing' in result['attrs'] and len(result['attrs']) == 1)

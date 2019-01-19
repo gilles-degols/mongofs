@@ -14,6 +14,9 @@
         "st_gid": 0
     },
     "length" : 39,
+    "host" : "localhost",
+    "uname": "root",
+    "gname": "root",
     "md5" : "d41d8cd98f00b204e9800998ecf8427e",
     "chunkSize" : 4,
     "attrs" : {

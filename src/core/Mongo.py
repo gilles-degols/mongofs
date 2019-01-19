@@ -23,7 +23,8 @@ class Mongo:
     LOCKED_FILE = 1
     FILE_NOT_FOUND = 2
 
-    def __init__(self):
+    # The do_clean_up argument is useful if we want to remove all entries from the db without taking care on wrong data in it (useful for test)
+    def __init__(self, do_clean_up = False):
         # We reuse the same connexion
         Mongo.configuration = Configuration()
         Mongo.cache = MongoCache()
@@ -32,6 +33,9 @@ class Mongo:
         self.gridfs_coll = Mongo.configuration.mongo_prefix() + 'files'
         self.files_coll = Mongo.configuration.mongo_prefix() + 'files.files'
         self.chunks_coll = Mongo.configuration.mongo_prefix() + 'files.chunks'
+
+        if do_clean_up is True:
+            self.clean_database()
 
         # Create the initial indexes
         self.create_indexes()

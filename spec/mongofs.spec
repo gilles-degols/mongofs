@@ -1,18 +1,24 @@
 %define debug_package %{nil}
 %global _python_bytecompile_errors_terminate_build 0
 
+%{!?_release: %define _version 0.2.5 }
+%{!?_release: %define _release 0 }
+# %{!?_src: %define _src %{_version}-%{_release} }
+
 Name:   mongofs
-Version:    1.2.1
-Release:    0
+Version:    %{_version}
+Release:    %{_release}
 Summary:    Mount MongoDB as local storage
 Group:  Gilles Degols
 License:    MIT
 Requires:   fuse >= 2.9.2-10
 Requires:   fuse-libs >= 2.9.2-10
+Requires:   python34 >= 3.4.9-1.el7, python34-pip >= 8.1.2-6.el7
 Requires(pre): shadow-utils >= 4.1.5.1-24
 BuildRequires:  dos2unix >= 6.0.3-7
 BuildRequires:  python34 >= 3.4.9-1.el7, python34-pip >= 8.1.2-6.el7
-Source0:    mongofs-1.2.1.tar.gz
+BuildRequires:  python-virtualenv
+Source:    %{_src}.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildArch:	noarch
@@ -31,26 +37,44 @@ getent group mongofs >/dev/null || groupadd -r mongofs
 getent passwd mongofs >/dev/null || useradd -r -g mongofs -d / -s /sbin/nologin -c "MongoFS User" mongofs
 
 %install
-install -d -m 0755 $RPM_BUILD_ROOT/usr/lib/mongofs
-install -d -m 0755 $RPM_BUILD_ROOT/usr/bin
-cp -r src/ $RPM_BUILD_ROOT/usr/lib/mongofs
+rm -rf ${RPM_BUILD_ROOT}
+
+install -d -m 0755 ${RPM_BUILD_ROOT}/usr/lib/mongofs
+install -d -m 0755 ${RPM_BUILD_ROOT}/usr/bin
+cp -r src/ ${RPM_BUILD_ROOT}/usr/lib/mongofs
 
 # Security to avoid creating an rpm with invalid end-of-line
-find $RPM_BUILD_ROOT/usr/lib/mongofs/src -type f -print0 | xargs -0 dos2unix
+find ${RPM_BUILD_ROOT}/usr/lib/mongofs/src -type f -print0 | xargs -0 dos2unix
 
-install -D -m 0644 conf/mongofs.json $RPM_BUILD_ROOT/etc/mongofs/mongofs.json
-install -D -m 0644 run $RPM_BUILD_ROOT/usr/lib/mongofs/run
-/usr/bin/ln -s /usr/lib/mongofs/run $RPM_BUILD_ROOT/usr/bin/mongofs-mount
-chmod +x $RPM_BUILD_ROOT/usr/lib/mongofs/run
+install -D -m 0644 conf/mongofs.json ${RPM_BUILD_ROOT}/etc/mongofs/mongofs.json
+install -D -m 0644 run ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
+/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/bin/mongofs-mount
+chmod +x ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
 
-/usr/bin/python3 -m venv $RPM_BUILD_ROOT/usr/lib/mongofs/environment
-source $RPM_BUILD_ROOT/usr/lib/mongofs/environment/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements.txt
+%define VPATH ${RPM_BUILD_ROOT}/usr/lib/mongofs/environment
+%define REQUIREMENTS_PATH requirements.txt
+/usr/bin/python3.6 -m pip install virtualenv
+/usr/bin/python3.6 -m virtualenv --python=python3.6 %{VPATH}/virtualenv
+/usr/bin/python3.6 -m virtualenv --python=python3.6 --relocatable --distribute %{VPATH}/virtualenv
+
+source %{VPATH}/virtualenv/bin/activate
+%{VPATH}/virtualenv/bin/pip3.6 install --upgrade pip
+%{VPATH}/virtualenv/bin/pip3.6 install setuptools
+%{VPATH}/virtualenv/bin/pip3.6 install -r %{REQUIREMENTS_PATH}
 deactivate
 
+rm -rf %{VPATH}/virtualenv/local
+
+find %{VPATH}/virtualenv/ -name __pycache__ -type d -prune -exec rm -rf {} +
+sed -i "s|%{VPATH}/virtualenv/bin/python|/../bin/python|g" %{VPATH}/virtualenv/bin/*;
+find %{VPATH}/virtualenv/lib/python3.6/site-packages/ -type f -exec sed -i "s|%{VPATH}/virtualenv/|/../|g" {} \;
+
+find %{VPATH}/virtualenv -name '*.py[co]' -delete
+sed -i "s|%{VPATH}|../..|g" %{VPATH}/virtualenv/bin/*
+
+
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf ${RPM_BUILD_ROOT}
 
 %files
 %defattr(-,root,root)

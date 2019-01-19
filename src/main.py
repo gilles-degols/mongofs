@@ -272,7 +272,6 @@ if __name__ == '__main__':
     configuration = Configuration()
     if configuration.is_development():
         logging.basicConfig(level=logging.DEBUG)
-        # logging.basicConfig(level=logging.ERROR)
         fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=True)
     else:
         logging.basicConfig(level=logging.ERROR)
