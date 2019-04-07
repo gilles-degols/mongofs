@@ -42,14 +42,14 @@ class TestGenericFile(unittest.TestCase):
         new_file = self.utils.files_coll.find_one({'directory_id':self.utils.root_id, 'filename': 'rename-file'})
         self.assertNotEqual(new_file, None)
 
-    def test_unlock(self):
+    def test_release(self):
         self.utils.insert_file()
-        gf = self.mongo.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
+        gf = self.mongo.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
         self.assertTrue('lock' in gf.json)
-        gf.unlock(filepath=self.utils.file.filepath)
+        gf.release(filepath=self.utils.file.filepath)
 
         gf = self.mongo.get_generic_file(filepath=self.utils.file.filepath)
-        self.assertTrue('lock' not in gf.json)
+        self.assertTrue('lock' not in gf.json or len(gf.json['lock']) == 0)
 
     def test_new_generic_file_file(self):
         # Creation of a basic file
