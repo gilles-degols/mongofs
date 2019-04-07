@@ -41,7 +41,7 @@ class GenericFile:
     LOCK_SHARED = 0             # fcntl.F_RDLCK
     LOCK_READ = LOCK_SHARED     # fcntl.F_RDLCK
     LOCK_EXCLUSIVE = 1          # fcntl.F_WRLCK
-    LOCK_WRITE = LOCK_EXCLUSIVE # fcntl.F_WRLCK
+    LOCK_WRITE = LOCK_EXCLUSIVE  # fcntl.F_WRLCK
     LOCK_UNLOCK = 2             # fcntl.F_UNLCK
 
     # Link to the mongo instance, created at startup
@@ -64,8 +64,8 @@ class GenericFile:
         self.metadata = json['metadata']
         self.gname = json['gname']
         self.uname = json['uname']
-        self.attrs = json.get('attrs',{})
-        self.lock = json.get('lock',{})
+        self.attrs = json.get('attrs', {})
+        self.lock = json.get('lock', {})
         self.length = json['length']
 
     """
@@ -78,7 +78,8 @@ class GenericFile:
         if not GenericFile.has_user_access_right(self, GenericFile.WRITE_RIGHTS):
             raise FuseOSError(errno.EACCES)
 
-        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata, attrs=self.attrs, host=self.host, uname=self.uname, gname=self.gname)
+        GenericFile.mongo.basic_save(generic_file=self, metadata=self.metadata,
+                                     attrs=self.attrs, host=self.host, uname=self.uname, gname=self.gname)
 
     """
         Indicates if the current GenericFile is in fact a directory
@@ -106,7 +107,8 @@ class GenericFile:
         if existing_file is not None:
             GenericFile.mongo.remove_generic_file(existing_file)
 
-        GenericFile.mongo.rename_generic_file_to(generic_file=self, initial_filepath=initial_filepath, destination_filepath=destination_filepath)
+        GenericFile.mongo.rename_generic_file_to(
+            generic_file=self, initial_filepath=initial_filepath, destination_filepath=destination_filepath)
         # We update the related filename and directory
         self.filename = destination_filepath.split('/')[-1]
         self.directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
@@ -125,7 +127,7 @@ class GenericFile:
         directory_id = None
 
         if not GenericFile.is_generic_filepath_available(filepath=filepath):
-            print('GenericFile not available for '+filepath)
+            print('GenericFile not available for ' + filepath)
             raise FuseOSError(errno.ENOENT)
 
         current_user = GenericFile.mongo.current_user() if filepath != '/' else GenericFile.mongo.process_user()
@@ -188,7 +190,7 @@ class GenericFile:
             struct['length'] = len(filename)
             struct['target'] = target
         else:
-            print('Unsupported file type: '+str(file_type))
+            print('Unsupported file type: ' + str(file_type))
             exit(1)
 
         # We create the file, then ask Mongo to save it, and finally we return it.
@@ -247,7 +249,7 @@ class GenericFile:
         if filepath != '/' and not GenericFile.mongo.generic_file_exists(filepath=directory_name):
             # There is no need to verify if this level above the current file is a directory or not, it will be automatically
             # checked by FUSE with readdir()
-            print('Missing intermediate directory "'+directory_name+'" for file "'+filepath+'".')
+            print('Missing intermediate directory "' + directory_name + '" for file "' + filepath + '".')
             return True
 
         # Now we need to verify there is no similar file already existing
@@ -287,4 +289,4 @@ class GenericFile:
     """
     @staticmethod
     def size_to_blocks(length):
-        return int(ceil(length / (65536*8)))
+        return int(ceil(length / (65536 * 8)))

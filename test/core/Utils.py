@@ -31,14 +31,14 @@ class Utils:
             root_raw = json_util.loads(f.read())
             # Special case for the root directory: we want to keep the same object id and so on. So we will simply drop
             # the default document created for "/", and add the current one.
-            self.files_coll.delete_one({'directory_id':None,'filename':''})
+            self.files_coll.delete_one({'directory_id': None, 'filename': ''})
             self.files_coll.insert_one(root_raw)
             self.root_id = root_raw['_id']
 
         with open('test/resources/data/file.json', 'r') as f:
             self.file_raw = json_util.loads(f.read())
         self.file = self.mongo.load_generic_file(self.file_raw)
-        self.file.filepath = '/'+self.file.filename
+        self.file.filepath = '/' + self.file.filename
 
         with open('test/resources/data/file-chunks.json', 'r') as f:
             self.file_chunks_raw = json_util.loads(f.read())
@@ -46,17 +46,17 @@ class Utils:
         with open('test/resources/data/directory.json', 'r') as f:
             self.directory_raw = json_util.loads(f.read())
         self.directory = self.mongo.load_generic_file(self.directory_raw)
-        self.directory.filepath = '/'+self.directory.filename
+        self.directory.filepath = '/' + self.directory.filename
 
         with open('test/resources/data/symbolic-link.json', 'r') as f:
             self.symbolic_link_raw = json_util.loads(f.read())
         self.symbolic_link = self.mongo.load_generic_file(self.symbolic_link_raw)
-        self.symbolic_link.filepath = '/'+self.symbolic_link.filename
+        self.symbolic_link.filepath = '/' + self.symbolic_link.filename
 
         with open('test/resources/data/directory-file.json', 'r') as f:
             self.directory_file_raw = json_util.loads(f.read())
         self.directory_file = self.mongo.load_generic_file(self.directory_file_raw)
-        self.directory_file.filepath = self.directory.filepath+'/'+self.directory_file.filename
+        self.directory_file.filepath = self.directory.filepath + '/' + self.directory_file.filename
 
     def insert_file(self):
         self.files_coll.insert_one(self.file_raw)
@@ -79,6 +79,6 @@ class Utils:
             self.mongo.flush_data_to_write(self.file)
 
         message = b''
-        for chunk in self.chunks_coll.find({'files_id':self.file._id}):
+        for chunk in self.chunks_coll.find({'files_id': self.file._id}):
             message += chunk['data']
         return message
