@@ -286,12 +286,22 @@ if __name__ == '__main__':
 
     # If the previous mount failed, we need to be sure to umount it, otherwise you will not be able to mount anymore
     Configuration.mounting_point = mounting_point
-    os.system('fusermount -u ' + mounting_point +' &>/dev/null')
+    os.system('fusermount -u ' + mounting_point + ' &>/dev/null')
+
+    allow_other = True
+    if os.getuid() != 0:
+        # If we are not mounting in root, we have to check option user_allow_other in /etc/fuse.conf
+        try:
+            file = open('/etc/fuse.conf', 'r')
+            allow_other = 'user_allow_other' in list(map(lambda l: l.strip(), file.readlines()))
+            file.close()
+        except:
+            allow_other = False
 
     configuration = Configuration()
     if configuration.is_development():
         logging.basicConfig(level=logging.DEBUG)
-        fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=True)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=allow_other)
     else:
         logging.basicConfig(level=logging.ERROR)
-        fuse = FUSE(MongoFS(), mounting_point, foreground=False, nothreads=False, allow_other=True)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=False, nothreads=False, allow_other=allow_other)

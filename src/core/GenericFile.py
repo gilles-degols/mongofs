@@ -128,7 +128,7 @@ class GenericFile:
             print('GenericFile not available for '+filepath)
             raise FuseOSError(errno.ENOENT)
 
-        current_user = GenericFile.mongo.current_user()
+        current_user = GenericFile.mongo.current_user() if filepath != '/' else GenericFile.mongo.process_user()
         uid = current_user['uid']
         gid = current_user['gid']
 
@@ -137,7 +137,7 @@ class GenericFile:
             directory_id = directory._id
 
             if not GenericFile.has_user_access_right(directory, GenericFile.WRITE_RIGHTS, current_user):
-                print('No rights to write on folder ' + directory.filename)
+                print('No rights to write on folder ' + directory.filename + ' for user ' + current_user['uname'])
                 raise FuseOSError(errno.EACCES)
 
             # check setgid bit. If set, give directory group to the created file
