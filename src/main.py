@@ -35,7 +35,7 @@ class MongoFS(LoggingMixIn, Operations):
         if self.configuration.is_development():
             # START DEBUG ONLY - Drop the old information from MongoDB
             self.mongo.clean_database()
-            self.mongo = Mongo() # Create a new instance to be sure to have the top folder
+            self.mongo = Mongo()  # Create a new instance to be sure to have the top folder
             # END DEBUG ONLY
 
         # The top folder of the FS is automatically created by the Mongo class.
@@ -103,7 +103,8 @@ class MongoFS(LoggingMixIn, Operations):
         we receive them (SYMLINK, TARGET) which is kinda weird.
     """
     def symlink(self, source, target):
-        GenericFile.new_generic_file(filepath=source, mode=0o777, file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=target)
+        GenericFile.new_generic_file(filepath=source, mode=0o777,
+                                     file_type=GenericFile.SYMBOLIC_LINK_TYPE, target=target)
 
     """
         Read a symbolic link and return the file we should be redirected to.
@@ -117,7 +118,7 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def read(self, path, size, offset, fh):
         file = self.mongo.get_generic_file(filepath=path)
-        tmp =  file.read_data(offset=offset, size=size)
+        tmp = file.read_data(offset=offset, size=size)
         return tmp
 
     """
@@ -260,8 +261,8 @@ class MongoFS(LoggingMixIn, Operations):
         General (static) information about the current file system.
     """
     def statfs(self, path):
-        print('Call statfs for '+str(path)+'...')
-        return dict(f_bsize=65536*8, f_frsize=65536*8, f_blocks=65536*8, f_bavail=65536)
+        print('Call statfs for ' + str(path) + '...')
+        return dict(f_bsize=65536 * 8, f_frsize=65536 * 8, f_blocks=65536 * 8, f_bavail=65536)
 
     """
         Flush data to MongoDB
@@ -270,6 +271,7 @@ class MongoFS(LoggingMixIn, Operations):
         file = self.mongo.get_generic_file(filepath=path)
         self.mongo.flush_data_to_write(file=file)
         return None
+
 
 if __name__ == '__main__':
     if len(argv) < 2:

@@ -37,7 +37,6 @@ def retry_connection(view_func):
         SIGKILL = 9
         os.kill(os.getpid(), SIGKILL)
 
-
     def _decorator(*args, **kwargs):
         new_connection_attempt = False
         st = time.time()
@@ -55,9 +54,9 @@ def retry_connection(view_func):
             except (NetworkTimeout, AutoReconnect, ConnectionFailure) as e:
                 dt = time.time() - st
                 if dt >= mongo_cache.configuration.mongo_access_attempt():
-                    print('Problem to execute the query, maybe we are disconnected from MongoDB. ' +
-                          'Max access attempt exceeded ('+str(int(dt))+'s >= '+str(mongo_cache.configuration.mongo_access_attempt())+'). ' +
-                          'Stop the mount.')
+                    print('Problem to execute the query, maybe we are disconnected from MongoDB. '
+                          + 'Max access attempt exceeded ('+str(int(dt))+'s >= '+str(mongo_cache.configuration.mongo_access_attempt())+'). '
+                          + 'Stop the mount.')
                     custom_kill(mongo_cache.configuration)
                     # We want to exit the current loop
                     exit(1)
@@ -66,6 +65,7 @@ def retry_connection(view_func):
                     new_connection_attempt = True
 
     return wraps(view_func)(_decorator)
+
 
 """
     This class will implement every method that we need to connect to MongoDB, and every query should be run through it (with the exceptions of tests). 
@@ -88,15 +88,18 @@ class MongoCache:
         Reset the cache completely. This should be done every time we delete / update more than 1 thing to avoid problems.
     """
     def reset_cache(self):
-        MongoCache.cache = ExpiringDict(max_len=MongoCache.configuration.cache_max_elements(), max_age_seconds=MongoCache.configuration.cache_timeout())
-        MongoCache.data_cache = ExpiringDict(max_len=MongoCache.configuration.data_cache_max_elements(), max_age_seconds=MongoCache.configuration.data_cache_timeout())
+        MongoCache.cache = ExpiringDict(max_len=MongoCache.configuration.cache_max_elements(),
+                                        max_age_seconds=MongoCache.configuration.cache_timeout())
+        MongoCache.data_cache = ExpiringDict(max_len=MongoCache.configuration.data_cache_max_elements(
+        ), max_age_seconds=MongoCache.configuration.data_cache_timeout())
 
     """
         Establish a connection to mongodb
     """
     def connect(self):
         mongo_path = 'mongodb://' + ','.join(MongoCache.configuration.mongo_hosts())
-        MongoCache.instance = MongoClient(mongo_path, w=MongoCache.configuration.mongo_write_acknowledgement(), j=MongoCache.configuration.mongo_write_j())
+        MongoCache.instance = MongoClient(
+            mongo_path, w=MongoCache.configuration.mongo_write_acknowledgement(), j=MongoCache.configuration.mongo_write_j())
 
         # If we were disconnected from MongoDB, it would be wise to reset the cache
         self.reset_cache()
@@ -107,7 +110,6 @@ class MongoCache:
     @retry_connection
     def create_index(self, coll, index):
         return self.database[coll].create_index(index)
-
 
     """
         Get the objects to connect to the correct database and collections
@@ -132,7 +134,7 @@ class MongoCache:
         # that's not pretty at all.
         if len(query) >= 2 and 'directory_id' in query and 'filename' in query:
             # In that case we check in the cache
-            key = str(query['directory_id'])+'/'+query['filename']
+            key = str(query['directory_id']) + '/' + query['filename']
 
             if key in MongoCache.cache:
                 try:
@@ -152,7 +154,7 @@ class MongoCache:
                     return doc
                 except Exception as e:
                     # The document might be deleted as the clean up could occur just 1ms afterwards when we access some attributes
-                    print('Exception while using the cache, it might happen some times (normally there should not be any impact): '+str(e))
+                    print('Exception while using the cache, it might happen some times (normally there should not be any impact): ' + str(e))
 
             # Key not found in cache, we try to load the object and store it before returning it (only if the document exists)
             res = self.database[coll].find_one(query)
@@ -170,7 +172,7 @@ class MongoCache:
     def find(self, coll, query, projection=None):
         # We need a small data cache for some blocks
         if len(query) == 2 and 'files_id' in query and 'n' in query and '$gte' in query['n'] and '$lte' in query['n']:
-            key = str(query['files_id'])+'/'+str(query['n']['$gte'])+'/'+str(query['n']['$lte'])
+            key = str(query['files_id']) + '/' + str(query['n']['$gte']) + '/' + str(query['n']['$lte'])
             if key in MongoCache.data_cache:
                 # Be careful: the clean up could occur just 1ms afterwards when we access some attributes
                 return MongoCache.data_cache[key]

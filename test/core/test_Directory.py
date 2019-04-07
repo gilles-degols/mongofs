@@ -38,5 +38,6 @@ class TestGenericFile(unittest.TestCase):
     def test_is_link(self):
         self.assertFalse(self.utils.directory.is_link())
 
+
 if __name__ == '__main__':
     unittest.main()
