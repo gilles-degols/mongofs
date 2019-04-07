@@ -9,7 +9,7 @@ from collections import namedtuple
     This is super-ugly as code, but useful at least.
 """
 class TestIntegration(unittest.TestCase):
-    TEST_DIRECTORY = '/mnt/mongofs-integration-test'
+    TEST_DIRECTORY = 'mnt/mongofs-integration-test'
     START_COMMAND = 'nohup python3 -m src.main '+TEST_DIRECTORY+' test/resources/conf/mongofs.json >/dev/null 2>&1 &'
 
     def setUp(self):
@@ -18,8 +18,14 @@ class TestIntegration(unittest.TestCase):
             'rm -rf '+TestIntegration.TEST_DIRECTORY+'/*'
         ]
         for command in commands:
-            self.execute_command(command=command)
+            result = self.execute_command(command=command)
+            if result.returncode != 0:
+                raise Exception(result.stdout)
+        
         self.execute_background_command(command=TestIntegration.START_COMMAND)
+
+    def tearDown(self):
+        self.execute_command(command='rm -rf '+TestIntegration.TEST_DIRECTORY)
 
     def execute_command(self, command):
         try:
@@ -159,8 +165,8 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(len(files), 1)
 
     def test_symbolic_link(self):
-        self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/hello')
-        res = self.execute_command(command='ln -s ' + TestIntegration.TEST_DIRECTORY + '/hello '+ TestIntegration.TEST_DIRECTORY + '/link')
+        res = self.execute_command(command='echo "some text" >> ' + TestIntegration.TEST_DIRECTORY + '/hello')
+        res = self.execute_command(command='ln -s hello '+ TestIntegration.TEST_DIRECTORY + '/link')
         self.assertEqual(res.returncode, 0)
         files = self.list_directory_content()
         self.assertEqual(len(files), 2)
