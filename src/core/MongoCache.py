@@ -4,7 +4,7 @@ import subprocess
 import time
 from expiringdict import ExpiringDict
 
-from pymongo.errors import PyMongoError
+from pymongo.errors import NetworkTimeout, AutoReconnect, ConnectionFailure
 from pymongo import MongoClient
 import gridfs
 from src.core.Configuration import Configuration
@@ -52,7 +52,7 @@ def retry_connection(view_func):
                 # print('Run mongo query: '+str(args)+' with '+str(kwargs))
                 response = view_func(*args, **kwargs)
                 return response
-            except PyMongoError as e:
+            except (NetworkTimeout, AutoReconnect, ConnectionFailure) as e:
                 dt = time.time() - st
                 if dt >= mongo_cache.configuration.mongo_access_attempt():
                     print('Problem to execute the query, maybe we are disconnected from MongoDB. ' +
