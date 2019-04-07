@@ -2,10 +2,11 @@
 import errno
 import grp
 import pwd
+import os
 from math import floor, ceil
-from errno import EDEADLOCK
 import time
 import pymongo
+import logging
 from expiringdict import ExpiringDict
 from fuse import FuseOSError, fuse_get_context
 
@@ -19,6 +20,7 @@ from src.core.SymbolicLink import SymbolicLink
 class Mongo:
     cache = None
     configuration = None
+    logger = logging.getLogger('Mongo')
 
     LOCKED_FILE = 1
     FILE_NOT_FOUND = 2
@@ -165,19 +167,6 @@ class Mongo:
         return lock_id
 
     """
-        Give the master lock id containing:
-            filename
-            pid -> 0
-            hostname
-        This "master" lock id is used to unlock specific locked file, as we sometimes receive an unlock order with the 
-        PID 0, and we need to fulfill it anyway
-    """
-    @staticmethod
-    def master_lock_id(filepath):
-        lock_id = filepath + ';' + str(0) + ';' + str(Mongo.configuration.hostname())
-        return lock_id
-
-    """
         Create a generic file in gridfs. No need to return it.
     """
     def create_generic_file(self, generic_file):
@@ -230,21 +219,21 @@ class Mongo:
          Throw an error if there is lock
          None if the file is not found
     """
-    def get_generic_file(self, filepath, take_lock=False):
+    def get_generic_file(self, filepath, lock=None):
         dt = time.time()
         lock_max_access = Mongo.configuration.lock_access_attempt()
         gf = Mongo.LOCKED_FILE
 
-        if take_lock is True:
-            lock_id = self.lock_id(filepath=filepath)
-        else:
-            lock_id = None
+        if lock is not None:
+            lock['id'] = self.lock_id(filepath=filepath)
 
         directory_id = self.get_last_directory_id_for_filepath(filepath=filepath)
         filename = filepath.split('/')[-1]
         while gf == Mongo.LOCKED_FILE and dt + lock_max_access >= time.time():
-            gf = self.get_generic_file_internal(filepath=filepath, directory_id=directory_id, filename=filename, lock=lock_id)
+            gf = self.get_generic_file_internal(filepath=filepath, directory_id=directory_id, filename=filename, lock=lock)
             if gf == Mongo.LOCKED_FILE:
+                if not 'wait' in lock or not lock['wait']:
+                    break
                 # Wait 1s before checking the lock again
                 time.sleep(1)
             elif gf == Mongo.FILE_NOT_FOUND:
@@ -253,7 +242,7 @@ class Mongo:
                 return gf
 
         # It means the file is still locked
-        raise FuseOSError(EDEADLOCK)
+        raise FuseOSError(errno.EAGAIN)
 
     """
         Retrieve any file / directory / link document from Mongo. 
@@ -269,42 +258,118 @@ class Mongo:
         dt = time.time()
         dt_timeout = dt + Mongo.configuration.lock_timeout()
 
-        # The same process could be the one having created the lock, so we need to let him have access to the file
-        current_process_lock = self.lock_id(filepath=filepath)
-        master_process_lock = Mongo.master_lock_id(filepath=filepath)
         if lock is not None:
-            gf = Mongo.cache.find_one_and_update(self.files_coll,
-                                                 {'directory_id':directory_id,'filename': filename,'lock':{'$exists':False}},
-                                                 {'$set':{'lock':{'creation':dt,'id':lock}}})
+            gf = Mongo.cache.find_one(self.files_coll, {'directory_id': directory_id, 'filename': filename})
             if gf is None:
-                # File might not exist, we don't know for sure.
-                gf = Mongo.cache.find_one(self.files_coll, {'directory_id':directory_id,'filename': filename})
-                if gf is None:
-                    return Mongo.FILE_NOT_FOUND
-                elif gf['lock']['creation'] >= dt_timeout:
-                    diff = int(dt - gf['lock']['creation'])
-                    print('Lock for '+filename+' was created/updated '+str(diff)+'s ago. Maximum timeout is '+
-                          str(Mongo.configuration.lock_timeout()+', so we remove the lock (if it was not taken by another '+
-                          'process right now).'))
-                    Mongo.cache.find_one_and_update(self.files_coll,
-                                                    {'directory_id':directory_id, 'filename': filename, 'lock.id':gf['lock']['id']},
-                                                    {'$unset':{'lock':''}})
-                    return self.get_generic_file_internal(filename=filename, lock=lock)
-                elif gf['lock']['id'] == current_process_lock:
-                    # It means it was the same that acquired the log, so he can have access to the file
-                    return Mongo.load_generic_file(gf)
+                return Mongo.FILE_NOT_FOUND
+            else:
+                self.logger.debug('set lock ' + ('unlock' if lock['type'] == GenericFile.LOCK_UNLOCK else ('read' if lock['type'] == GenericFile.LOCK_READ else 'write')))
+                if 'lock' not in gf or ('lock' in gf and len(gf['lock'])) == 0:
+                    if lock['type'] == GenericFile.LOCK_UNLOCK:
+                        return Mongo.load_generic_file(gf)
+                    else:
+                        self.logger.debug('no lock, so set own lock')
+                        Mongo.cache.find_one_and_update(self.files_coll,
+                            {'$and': [
+                                {'directory_id':directory_id,'filename': filename},
+                                {'$or': [{'lock': {'$exists': False}}, {'lock': {'$size': 0}}]},
+                            ]},
+                            {'$set':{'lock_version': 1, 'lock':[{'creation':dt,'id':lock['id'],'type':lock['type'],'hostname':str(Mongo.configuration.hostname())}]}})
                 else:
-                    return Mongo.LOCKED_FILE
-            return Mongo.load_generic_file(gf)
+                    locks = list(filter(lambda l: l['creation'] < dt_timeout, gf['lock']))
+                    if len(locks) == 0:
+                        lock_ids = list(map(lambda l: l['id'], gf['lock']))
+                        self.logger.debug('Lock fors '+filename+' reached maximum timeout is '+
+                            str(Mongo.configuration.lock_timeout()+', so we remove the locks (if it was not taken by another '+
+                            'process right now).'))
+                        Mongo.cache.find_one_and_update(self.files_coll,
+                                                        {'directory_id':directory_id, 'filename': filename, 'lock_version': gf['lock_version']},
+                                                        {'$unset':{'lock':'', 'lock_version': ''}})
+                    else:
+                        only_own_lock = len(locks) == 1 and locks[0]['id'] == lock['id']
+                        own_lock_present = len(list(filter(lambda l: l['id'] == lock['id'], locks))) > 0
+                        if lock['type'] == GenericFile.LOCK_UNLOCK:
+                            # unlock lock can be set only when you are the only one locking or when you belong a lock
+                            if only_own_lock:
+                                self.logger.debug('remove only personal own lock')
+                                Mongo.cache.find_one_and_update(self.files_coll,
+                                    {'directory_id':directory_id, 'filename': filename, 'lock_version': gf['lock_version']},
+                                    {'$unset':{'lock':'', 'lock_version': ''}})
+                            elif own_lock_present:
+                                self.logger.debug('remove personal own lock amongst others')
+                                Mongo.cache.find_one_and_update(self.files_coll,
+                                    {'directory_id':directory_id, 'filename': filename},
+                                    {'$pull':{'lock': {'id': lock['id']}}, '$inc': {'lock_version': 1}})
+                                # here we need to return immediately instead of trying to call the function back
+                                # otherwise we would end attempt to unlock a file with other locks
+                                gf = Mongo.cache.find_one(self.files_coll, {'directory_id': directory_id, 'filename': filename})
+                                return Mongo.load_generic_file(gf)
+                            else:
+                                return Mongo.LOCKED_FILE
+                        elif only_own_lock:
+                            # if we are the only one locking, we can just update our own lock
+                            if locks[0]['type'] == lock['type']:
+                                self.logger.debug('lock already set with right value')
+                                return Mongo.load_generic_file(gf)
+                            else:
+                                self.logger.debug('update own only lock')
+                                result = Mongo.cache.find_one_and_update(self.files_coll,
+                                    {'directory_id':directory_id, 'filename': filename, 'lock_version': gf['lock_version']},
+                                    {
+                                        '$set':{'lock': [{'creation':dt,'id':lock['id'],'type':lock['type'],'hostname':str(Mongo.configuration.hostname())}]},
+                                        '$inc': {'lock_version': 1}
+                                    })
+                        elif lock['type'] == GenericFile.LOCK_SHARED and locks[0]['type'] == GenericFile.LOCK_SHARED:
+                            # if we want a shared lock, we can add one of all other locks are also shared
+                            if own_lock_present:
+                                self.logger.debug('own read lock present')
+                                return Mongo.load_generic_file(gf)
+                            else:
+                                Mongo.cache.find_one_and_update(self.files_coll,
+                                    {'directory_id':directory_id, 'filename': filename, 'lock_version': gf['lock_version']},
+                                    {
+                                        '$push':{'lock': {'creation':dt,'id':lock['id'],'type':lock['type'],'hostname':str(Mongo.configuration.hostname())}},
+                                        '$inc': {'lock_version': 1}
+                                    })
+                        else:
+                            # if we fall here, that means that either we try to set an exclusive lock and there are other locks presents
+                            # or that we try to set a shared lock and the other lock is an exclusive one
+                            return Mongo.LOCKED_FILE
+            
+            self.logger.debug('check lock applied')
+            return self.get_generic_file_internal(filepath=filepath, directory_id=directory_id, filename=filename, lock=lock)
         else:
-            # We don't really need to verify the lock directly in the MongoDB query, the logic will be outside MongoDB anyway
+            # We don't really need to verify the lock here because the processes always ask an unlock or a lock before any operation
             gf = Mongo.cache.find_one(self.files_coll, {'directory_id':directory_id,'filename': filename})
             if gf is not None:
-                if 'lock' in gf and gf['lock']['id'] != current_process_lock and current_process_lock != master_process_lock:
-                    return Mongo.LOCKED_FILE
-                else:
-                    return Mongo.load_generic_file(gf)
+                return Mongo.load_generic_file(gf)
             return Mongo.FILE_NOT_FOUND
+
+    """
+        Test a lock and returns the first blocking lock if any
+        This is used by the F_GETLK command
+    """
+    def test_lock_and_get_first_blocking(self, filepath, directory_id, filename, lock):
+        dt = time.time()
+        dt_timeout = dt + Mongo.configuration.lock_timeout()
+
+        gf = Mongo.cache.find_one(self.files_coll, {'directory_id': directory_id, 'filename': filename})
+        if gf is None:
+            raise FuseOSError(errno.ENOENT)
+        else:
+            if 'lock' not in gf or ('lock' in gf and len(gf['lock'])) == 0:
+                return None
+            else:
+                locks = list(filter(lambda l: l['creation'] < dt_timeout, gf['lock']))
+                if len(locks) == 0:
+                    return None
+                else:
+                    only_own_lock = len(locks) == 1 and locks[0]['id'] == lock['id']
+                    own_lock_present = len(list(filter(lambda l: l['id'] == lock['id'], locks))) > 0
+                    if only_own_lock or (lock['type'] == GenericFile.LOCK_UNLOCK and own_lock_present) or (lock['type'] == GenericFile.LOCK_SHARED and locks[0].type == GenericFile.LOCK_SHARED):
+                        return None
+                    else:
+                        return locks[0]
 
     """
         Return the last directory_id for a given filepath. Return None if none are found.
@@ -506,22 +571,11 @@ class Mongo:
         self.add_nlink_directory(directory_id=destination_directory_id, value=-1)
 
     """
-        Remove a lock to a generic file (only if we are owner of it). We do not care about the lock type. 
+        Remove locks for a generic file 
     """
-    def unlock_generic_file(self, filepath, generic_file):
-        lock_id = self.lock_id(filepath=filepath)
-        master_lock_id = Mongo.master_lock_id(filepath=filepath)
-        if 'id' not in generic_file.lock or lock_id not in [master_lock_id, generic_file.lock['id']]:
-            print('Trying to release a non-existing lock, or one that we do not own. We do nothing.')
-            return True
-
-        # For now, if we have a master-lock, we need to remove any lock. In that case, we should still verify that the lock
-        # is released by the appropriate host (TODO).
-        if lock_id == master_lock_id:
-            Mongo.cache.find_one_and_update(self.files_coll,{'_id': generic_file._id}, {'$unset': {'lock': ''}})
-        else:
-            Mongo.cache.find_one_and_update(self.files_coll, {'_id': generic_file._id, 'lock.id': lock_id},
-                                                {'$unset': {'lock': ''}})
+    def release_generic_file(self, filepath, generic_file):
+        lock_id = self.lock_id(filepath)
+        Mongo.cache.find_one_and_update(self.files_coll,{'_id': generic_file._id}, {'$pull': {'lock': {'id': lock_id}}})
         return True
 
     """

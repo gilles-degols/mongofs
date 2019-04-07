@@ -2,7 +2,10 @@
 
 import logging
 import time
-import os, errno
+import os
+import errno
+import fcntl
+from ctypes import *
 
 from sys import argv, exit
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
@@ -46,19 +49,35 @@ class MongoFS(LoggingMixIn, Operations):
     """
         Acquire a lock on a specific file.
     """
-    def lock(self, path, fip, cmd, lock):
-        # Getting the file object with a lock is enough to be sure there is one on it.
-        self.mongo.get_generic_file(filepath=path, take_lock=True)
-        return lock
+    def lock(self, path, fh, cmd, lock):
+        # lock is a pointer to a struct flock. The first field is a short
+        # with the lock type, so we can just cast it to a POINTER(c_short)
+        # We won't manage locking only part of file, so we don't care about the
+        # complete struct
+        lock_type_pointer = cast(lock, POINTER(c_short))
+        lock_type = lock_type_pointer[0]
+
+        if cmd == fcntl.F_GETLK:
+            blocking = test_lock_and_get_first_blocking(filepath=path, lock={'type': lock_type})
+            if blocking is None:
+                # We modify the pointer by setting F_UNLCK
+                lock_type_pointer[0] = fcntl.F_UNLCK
+            else:
+                # We modify the pointer by setting the blocking type of the locks
+                lock_type_pointer[0] = blocking['type']
+        elif cmd == fcntl.F_SETLK or cmd == fcntl.F_SETLKW:
+            if self.mongo.get_generic_file(filepath=path, lock={'type': lock_type, 'wait': cmd == fcntl.F_SETLKW}) is None:
+                raise FuseOSError(errno.ENOENT)
+        else:
+            raise FuseOSError(errno.EBADF)
+        return 0
 
     """
         Release the lock on a specific file.
     """
     def release(self, path, fh):
-        print('Release the lock on '+str(path)+': '+str(fh))
         gf = self.mongo.get_generic_file(filepath=path)
-        print('Before unlock: '+str(gf.lock))
-        gf.unlock(filepath=path)
+        gf.release(filepath=path)
         return 0
 
     """
@@ -66,7 +85,7 @@ class MongoFS(LoggingMixIn, Operations):
     """
     def releasedir(self, path, fh):
         gf = self.mongo.get_generic_file(filepath=path)
-        gf.unlock(filepath=path)
+        gf.release(filepath=path)
         return 0
 
     """

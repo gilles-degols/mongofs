@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from bson import json_util
 from fuse import FuseOSError
 
@@ -12,7 +13,7 @@ from src.core.SymbolicLink import SymbolicLink
 from test.core.Utils import Utils
 
 class TestMongo(unittest.TestCase):
-    def setUp(self):
+    def setUp(self):        
         Configuration.FILEPATH = 'test/resources/conf/mongofs.json'
         self.obj = Mongo(do_clean_up=True)
         GenericFile.mongo = self.obj
@@ -44,13 +45,6 @@ class TestMongo(unittest.TestCase):
         pid = self.obj.current_user()['pid']
         expected_lock = filepath+';'+str(pid)+';'+hostname
         self.assertEqual(self.obj.lock_id(filepath=filepath), expected_lock)
-
-    def test_master_lock_id(self):
-        filepath = 'test-file'
-        hostname = Mongo.configuration.hostname()
-        pid = 0
-        expected_lock = filepath + ';' + str(pid) + ';' + hostname
-        self.assertEqual(self.obj.master_lock_id(filepath=filepath), expected_lock)
 
     def test_create_generic_file(self):
         self.utils.insert_file()
@@ -101,12 +95,77 @@ class TestMongo(unittest.TestCase):
 
     def test_get_generic_file_take_lock(self):
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
         self.assertIsInstance(gf, File)
+        self.assertTrue('lock' in gf.json)
+        self.assertEqual(len(gf.json['lock']), 1)
+        self.assertEqual(gf.json['lock'][0]['type'], GenericFile.LOCK_WRITE)
 
         # We are the same owner, so normally, we should still be able to take the file if there is a lock on it.
-        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_READ})
         self.assertIsInstance(gf, File)
+        self.assertTrue('lock' in gf.json)
+        self.assertEqual(len(gf.json['lock']), 1)
+        self.assertEqual(gf.json['lock'][0]['type'], GenericFile.LOCK_READ)
+
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_UNLOCK})
+        self.assertIsInstance(gf, File)
+        self.assertFalse('lock' in gf.json)
+
+    def test_get_file_multiple_lock_process(self):
+        with patch.object(self.obj, 'current_user') as mock_current_user:
+            mock_current_user.return_value = self.obj.user(1, 1, 1)
+            self.utils.insert_file()
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
+            self.assertIsInstance(gf, File)
+            self.assertTrue('lock' in gf.json)
+            self.assertEqual(len(gf.json['lock']), 1)
+            self.assertEqual(gf.json['lock'][0]['type'], GenericFile.LOCK_WRITE)
+
+            mock_current_user.return_value = self.obj.user(2, 2, 2)
+            with self.assertRaises(FuseOSError):
+                self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
+            with self.assertRaises(FuseOSError):
+                self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_READ})
+
+            mock_current_user.return_value = self.obj.user(1, 1, 1)
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_READ})
+            self.assertIsInstance(gf, File)
+            self.assertEqual(len(gf.json['lock']), 1)
+            self.assertEqual(gf.json['lock'][0]['type'], GenericFile.LOCK_READ)
+
+            mock_current_user.return_value = self.obj.user(2, 2, 2)
+            with self.assertRaises(FuseOSError):
+                self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_READ})
+            self.assertIsInstance(gf, File)
+            self.assertTrue('lock' in gf.json)
+            self.assertEqual(len(gf.json['lock']), 2)
+            self.assertEqual(gf.json['lock'][0]['type'], GenericFile.LOCK_READ)
+            self.assertEqual(gf.json['lock'][1]['type'], GenericFile.LOCK_READ)
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_UNLOCK})
+            self.assertTrue('lock' in gf.json)
+            self.assertEqual(len(gf.json['lock']), 1)
+
+            self.obj.release_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
+            self.assertTrue('lock' in gf.json)
+            self.assertEqual(len(gf.json['lock']), 1)
+
+            self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_READ})
+            mock_current_user.return_value = self.obj.user(1, 1, 1)
+            self.obj.release_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
+            self.assertTrue('lock' in gf.json)
+            self.assertEqual(len(gf.json['lock']), 1)
+
+            with self.assertRaises(FuseOSError):
+                self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_UNLOCK})
+
+            mock_current_user.return_value = self.obj.user(2, 2, 2)
+            gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_UNLOCK})
+            self.assertTrue('lock' not in gf.json)
+            
 
     def test_get_generic_file_missing(self):
         gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
@@ -197,20 +256,20 @@ class TestMongo(unittest.TestCase):
         new_file = self.utils.files_coll.find_one({'directory_id':self.utils.root_id,'filename':'rename-test'})
         self.assertNotEqual(new_file, None)
 
-    def test_unlock_generic_file(self):
+    def test_release_generic_file(self):
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=True)
-        result = self.obj.unlock_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock={'type': GenericFile.LOCK_WRITE})
+        result = self.obj.release_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
         self.assertTrue(result)
 
         gf = self.obj.get_generic_file(filepath=self.utils.file.filepath)
-        self.assertTrue('lock' not in gf.json)
+        self.assertTrue('lock' not in gf.json or len(gf.json['lock']) == 0)
 
-    def test_unlock_generic_file_no_lock(self):
+    def test_release_generic_file_no_lock(self):
         # Verify if it does not crash if there is no lock
         self.utils.insert_file()
-        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, take_lock=False)
-        result = self.obj.unlock_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
+        gf = self.obj.get_generic_file(filepath=self.utils.file.filepath, lock=None)
+        result = self.obj.release_generic_file(filepath=self.utils.file.filepath, generic_file=gf)
         self.assertTrue(result)
 
     def test_basic_save(self):

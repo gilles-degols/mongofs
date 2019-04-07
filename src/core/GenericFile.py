@@ -38,6 +38,12 @@ class GenericFile:
     WRITE_RIGHTS = 0o2
     READ_RIGHTS = 0o4
 
+    LOCK_SHARED = 0             # fcntl.F_RDLCK
+    LOCK_READ = LOCK_SHARED     # fcntl.F_RDLCK
+    LOCK_EXCLUSIVE = 1          # fcntl.F_WRLCK
+    LOCK_WRITE = LOCK_EXCLUSIVE # fcntl.F_WRLCK
+    LOCK_UNLOCK = 2             # fcntl.F_UNLCK
+
     # Link to the mongo instance, created at startup
     mongo = None
     configuration = None
@@ -106,11 +112,10 @@ class GenericFile:
         self.directory_id = GenericFile.get_directory_id(filepath=destination_filepath)
 
     """
-        Try to release a lock on a generic file. The lock is initially generated when we try to load the file, so there
-        is no method here for the opposite management of lock. 
+        Release all locks on a file
     """
-    def unlock(self, filepath):
-        return GenericFile.mongo.unlock_generic_file(filepath=filepath, generic_file=self)
+    def release(self, filepath):
+        return GenericFile.mongo.release_generic_file(filepath=filepath, generic_file=self)
 
     """
         Return an instance of a file / directory when we want to create a new one
