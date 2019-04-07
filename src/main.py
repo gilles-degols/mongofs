@@ -235,7 +235,7 @@ class MongoFS(LoggingMixIn, Operations):
             del gf.attrs[name]
             gf.basic_save()
         else:
-            raise FuseOSError(errno.ENOATTR)
+            raise FuseOSError(errno.EACCES)
 
     """
         Update the access and update time for a given path
