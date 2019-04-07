@@ -84,9 +84,18 @@ class Mongo:
     """
     def current_user(self):
         raw = fuse_get_context()
-        uid = raw[0]
-        gid = raw[1]
+        return self.user(raw[0], raw[1], raw[2])        
 
+    """
+        Some information about the user running the process.
+    """
+    def process_user(self):
+        return self.user(os.getuid(), os.getgid(), os.getpid())
+
+    """
+        Some information about the user with uid and gid
+    """
+    def user(self, uid, gid, pid):
         try:
             user_info = self.user_cache[uid]
         except KeyError:
@@ -100,7 +109,7 @@ class Mongo:
                 gids.append(gid)
             user_info = {'uname': pw_uid.pw_name, 'gids': gids, 'gnames': gnames}
             self.user_cache[uid] = user_info
-        return {'uid': uid, 'gid': gid, 'pid': raw[2], 'uname': user_info['uname'], 'gids': user_info['gids'], 'gnames': user_info['gnames']}
+        return {'uid': uid, 'gid': gid, 'pid': pid, 'uname': user_info['uname'], 'gids': user_info['gids'], 'gnames': user_info['gnames']}
 
     """
         Get user name name for a name id
