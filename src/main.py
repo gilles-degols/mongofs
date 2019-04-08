@@ -58,7 +58,7 @@ class MongoFS(LoggingMixIn, Operations):
         lock_type = lock_type_pointer[0]
 
         if cmd == fcntl.F_GETLK:
-            blocking = test_lock_and_get_first_blocking(filepath=path, lock={'type': lock_type})
+            blocking = self.mongo.test_lock_and_get_first_blocking(filepath=path, lock={'type': lock_type})
             if blocking is None:
                 # We modify the pointer by setting F_UNLCK
                 lock_type_pointer[0] = fcntl.F_UNLCK

@@ -63,7 +63,7 @@ sudo mongofs-mount /mnt/data
 We assume that you already have a MongoDB installation, otherwise, follow the procedure described here: https://docs.mongodb.com/manual/installation/
 ```
 git clone git@github.com:gilles-degols/mongofs.git
-yum -y install python36u fuse fuse-libs
+yum -y install python36 fuse fuse-libs
 python3 -m ensurepip --default-pip
 python3 -m pip install --upgrade pip
 python3 -m pip uninstall fuse # Otherwise conflicts can happen with fusepy

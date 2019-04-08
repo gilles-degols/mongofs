@@ -1,9 +1,12 @@
 %define debug_package %{nil}
 %global _python_bytecompile_errors_terminate_build 0
+%define __python /usr/bin/python3.6
 
-%{!?_release: %define _version 1.2.2 }
+%{!?_release: %define _version 1.2.3 }
 %{!?_release: %define _release 0 }
-# %{!?_src: %define _src %{_version}-%{_release} }
+
+# Following line is needed if you compile
+%{!?_src: %define _src %{_version}-%{_release} }
 
 Name:   mongofs
 Version:    %{_version}
@@ -38,7 +41,6 @@ getent passwd mongofs >/dev/null || useradd -r -g mongofs -d / -s /sbin/nologin 
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
-
 install -d -m 0755 ${RPM_BUILD_ROOT}/usr/lib/mongofs
 install -d -m 0755 ${RPM_BUILD_ROOT}/usr/bin
 cp -r src/ ${RPM_BUILD_ROOT}/usr/lib/mongofs
@@ -53,7 +55,11 @@ chmod +x ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
 
 %define VPATH ${RPM_BUILD_ROOT}/usr/lib/mongofs/environment
 %define REQUIREMENTS_PATH requirements.txt
-/usr/bin/python3.6 -m pip install virtualenv
+
+# If you upgrade from pip 8.1.2 to 19.0.3, you will get a nice bug below, which only happens in a spec file for whatever
+# reason. So we assume that we have the virtualenv installed (should always be the case)
+# /usr/bin/python3.6 -m pip install virtualenv
+
 /usr/bin/python3.6 -m virtualenv --python=python3.6 %{VPATH}/virtualenv
 /usr/bin/python3.6 -m virtualenv --python=python3.6 --relocatable --distribute %{VPATH}/virtualenv
 
@@ -72,7 +78,6 @@ find %{VPATH}/virtualenv/lib/python3.6/site-packages/ -type f -exec sed -i "s|%{
 find %{VPATH}/virtualenv -name '*.py[co]' -delete
 sed -i "s|%{VPATH}|../..|g" %{VPATH}/virtualenv/bin/*
 
-
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
@@ -83,6 +88,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Mon Apr 08 2019 Gilles Degols - 1.2.3-0
+- Fix the lock system of files between nodes
+
 * Sat Jan 19 2019 Gilles Degols - 1.2.2-0
 - Proper RPM packaging and fix unit tests
 
