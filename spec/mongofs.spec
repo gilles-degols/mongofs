@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 %define __python /usr/bin/python3.6
 
-%{!?_release: %define _version 1.2.3 }
+%{!?_release: %define _version 1.3.0 }
 %{!?_release: %define _release 0 }
 
 # Following line is needed if you compile
@@ -51,7 +51,7 @@ find ${RPM_BUILD_ROOT}/usr/lib/mongofs/src -type f -print0 | xargs -0 dos2unix
 
 install -D -m 0644 conf/mongofs.json ${RPM_BUILD_ROOT}/etc/mongofs/mongofs.json
 install -D -m 0755 run ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
-/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/bin/mongofs-Mount
+/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/bin/mongofs-mount
 /usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/sbin/mount.mongofs
 
 %define VPATH ${RPM_BUILD_ROOT}/usr/lib/mongofs/environment
@@ -90,6 +90,10 @@ rm -rf ${RPM_BUILD_ROOT}
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Tue Apr 09 2019 Gilles Degols - 1.3.0-0
+- Fix working directory of run script
+- Allow mongofs to be mounted as any other file system
+
 * Mon Apr 08 2019 Gilles Degols - 1.2.3-0
 - Fix the lock system of files between nodes
 
