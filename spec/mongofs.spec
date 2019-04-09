@@ -43,15 +43,16 @@ getent passwd mongofs >/dev/null || useradd -r -g mongofs -d / -s /sbin/nologin 
 rm -rf ${RPM_BUILD_ROOT}
 install -d -m 0755 ${RPM_BUILD_ROOT}/usr/lib/mongofs
 install -d -m 0755 ${RPM_BUILD_ROOT}/usr/bin
+install -d -m 0755 ${RPM_BUILD_ROOT}/usr/sbin
 cp -r src/ ${RPM_BUILD_ROOT}/usr/lib/mongofs
 
 # Security to avoid creating an rpm with invalid end-of-line
 find ${RPM_BUILD_ROOT}/usr/lib/mongofs/src -type f -print0 | xargs -0 dos2unix
 
 install -D -m 0644 conf/mongofs.json ${RPM_BUILD_ROOT}/etc/mongofs/mongofs.json
-install -D -m 0644 run ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
-/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/bin/mongofs-mount
-chmod +x ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
+install -D -m 0755 run ${RPM_BUILD_ROOT}/usr/lib/mongofs/run
+/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/bin/mongofs-Mount
+/usr/bin/ln -s /usr/lib/mongofs/run ${RPM_BUILD_ROOT}/usr/sbin/mount.mongofs
 
 %define VPATH ${RPM_BUILD_ROOT}/usr/lib/mongofs/environment
 %define REQUIREMENTS_PATH requirements.txt
@@ -85,6 +86,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %defattr(-,root,root)
 /usr/lib/mongofs
 /usr/bin/mongofs-mount
+/usr/sbin/mount.mongofs
 %config /etc/mongofs/mongofs.json
 
 %changelog

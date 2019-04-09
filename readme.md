@@ -1,23 +1,27 @@
 ### Requirements:
-Tested Operating Systems: Centos 7 
+
+Tested Operating Systems: Centos 7
 
 Tested MongoDB: 3.6. Should be able to run easily since 3.0. Works with sharding and replica set.
 
 Tested Python version: 3.4/3.6.
 
 ### General information
+
 Mount a Mongo database as a FUSE file system. Purpose of this implementation is the following:
+
 1. Scaling only limited to your MongoDB installation.
-2. Avoid limitations of basic file systems by allowing the following: 
+2. Avoid limitations of basic file systems by allowing the following:
    - You can put millions of files in the same directory
    - Infinite hierarchy
-   - Automatic redundancy 
+   - Automatic redundancy
    - Automatic compression
    - Easier setup than HDFS (and more appropriate for small files)
-   - Faster creation/deletion of millions of files 
+   - Faster creation/deletion of millions of files
    - No "advanced" problems that you could find with inodes, ... once you start to have millions of files.
 
 Features development:
+
 - [x] Directory: creation, deletion, listing of files
 - [x] File: creation, writing, reading, deletion
 - [x] Symbolic link: creation, deletion
@@ -37,13 +41,14 @@ What is not possible or recommended with MongoFS:
 
 1. Any limitation related to the underlying FUSE file system, and the fusepy library on top of it, which includes:
 
-  1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
+   1.1. Hard links: https://github.com/libfuse/libfuse/issues/79
 
 2. Expecting 100MB/s as writing speed. There is an overhead to decode, then store the data in MongoDB. But the slowest part is fusepy so we cannot improve much more the current code. Check benchmarks below if you want some numbers.
 
 ### Installation guide
 
 1. Install the different packages
+
 ```
 yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.2.2/mongofs-1.2.2-0.noarch.rpm
 ```
@@ -51,16 +56,17 @@ yum -y install https://github.com/gilles-degols/mongofs/releases/download/v1.2.2
 2. Mount the file system with the default parameters in /etc/mongofs/mongofs.json
 
 For more information about the configuration parameters, check the appropriate section below.
+
 ```
 sudo mongofs-mount /mnt/data
 ```
-
 
 ### Developer's guide
 
 1. First installation
 
 We assume that you already have a MongoDB installation, otherwise, follow the procedure described here: https://docs.mongodb.com/manual/installation/
+
 ```
 git clone git@github.com:gilles-degols/mongofs.git
 yum -y install python36 fuse fuse-libs
@@ -87,17 +93,19 @@ python3 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_sav
 
 By default the configuration file is in /etc/mongofs/mongofs.json. You can give an alternative path in the command line
 directly, as second argument.
+
 ```
 mkdir -p /mnt/data
 python3 -m src.main /mnt/data
 
 # With a specific configuration filepath (absolute or relative)
-python3 -m src.main /mnt/data conf/mongofs.json
+python3 -m src.main conf/mongofs.json /mnt/data
 ```
 
 4. Troubleshooting
 
 If there was a problem during the mount, the mounting directory might have some problems (impossible to delete it, re-use it, ...):
+
 ```
 rmdir /mnt/data
 # rmdir: failed to remove ‘/mnt/att’: Device or resource busy
@@ -109,31 +117,60 @@ rmdir /mnt/data
 5. Create a new release
 
 Add a tag for your version, and push it to the remote Git repository.
+
 ```
 git tag -a v1.2.2 -m "Version 1.2.2"
 git push origin v1.2.2
 ```
 
 Set up your environment:
+
 ```
 yum install -y rpm-build
 mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 ```
 
 Generate a new archive containing all the sources in Github, in the appropriate directory. Then, generate the rpm.
+
 ```
 cp -r mongofs mongofs-1.2.2
 tar -zcvf ~/rpmbuild/SOURCES/mongofs-1.2.2.tar.gz mongofs-1.2.2
 rpmbuild -ba mongofs-1.2.2/spec/mongofs.spec
 ```
 
-6. Benchmarks
+6. Mount mongofs with package installed
+
+Once the package is installed, mongofs is recognized as different type of mount. You can just run
+
+```
+mount -t mongofs <config-file> <mount-point> -o <mount-options>
+```
+
+You could also create an entry in systemd. Don't forget to name your unit file after your mountin-point (eg `/usr/lib/systemd/system/mnt-mongofs.mount`)
+
+```
+[Unit]
+Description=M³ mongofs mounting point
+Requires=mongod.service
+After=mongod.service
+
+[Mount]
+What=/etc/mongofs/mongofs.json
+Where=<mounting-point>
+Type=mongofs
+
+[Install]
+WantedBy=multi-user.target
+```
+
+7. Benchmarks
 
 If you want to test the performance of MongoFS versus your file system, you can easily test the handling of big files. The numbers given below were generated on a VM with 3GB of RAM & 4vCPU hosted on a Desktop computer with 16GB of RAM & SSD. So the reading speed is not strictly related to the disk as everything might be in cache on the OS level.
 Benchmarking is a difficult subject, so be careful when you compare numbers.
 Be aware that FUSE + fusepy (library used in mongofs) is in fact the slowest part of writing, and unfortunately we cannot improve the performance a lot more until it is improved on their side.
+
 ```
-python3 -m src.main /mnt/data conf/mongofs.json
+python3 -m src.main conf/mongofs.json /mnt/data
 
 # Test local file system
 yes "a" | dd of=output.dat bs=4k count=2500000 iflag=fullblock && time cat output.dat > /dev/null
@@ -166,5 +203,3 @@ Default configuration parameters can be seen in conf/mongofs.json, every one of 
 11. host: Current hostname of the machine itself (so, it should be unique), to manage file locks.
 12. lock.access_attempt_s: Number of seconds we try to access to a locked file before giving up and returning an error to the client. Put 0 for infinity.
 13. lock.timeout_s: Maximum number of seconds we consider a lock valid. To avoid a deadlock if a server is down, we delete the lock after that amount of time. Put 0 for infinity.
-
-

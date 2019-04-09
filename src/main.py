@@ -275,14 +275,28 @@ class MongoFS(LoggingMixIn, Operations):
 
 if __name__ == '__main__':
     if len(argv) < 2:
-        print('usage: %s <mountpoint> (<configuration_filepath>)' % argv[0])
+        print('usage: %s (<configuration_filepath>) <mountpoint> (-o <fuse_mount_options>)' % argv[0])
         exit(1)
 
-    if len(argv) == 3:
-        configuration_filepath = argv[2]
-        Configuration.FILEPATH = configuration_filepath
+    fuse_options = {}
 
     mounting_point = str(argv[1])
+    mongofs_argv_size = len(argv)
+
+    if argv.count('-o') > 0:
+        # let's construct a dictionnary for fuse options
+        mongofs_argv_size = argv.index('-o')
+        for fuse_opt_arg in argv[mongofs_argv_size + 1].split(','):
+            fuse_opt_arg_parts = fuse_opt_arg.split('=')
+            if (len(fuse_opt_arg_parts) == 1):
+                fuse_opt_arg_parts.append(True)
+            fuse_options[fuse_opt_arg_parts[0]] = fuse_opt_arg_parts[1]
+
+    if mongofs_argv_size >= 3:
+        configuration_filepath = argv[1]
+        Configuration.FILEPATH = configuration_filepath
+        mounting_point = str(argv[2])
+
     if not mounting_point.startswith('/'):
         mounting_point = os.getcwd() + '/' + mounting_point
 
@@ -303,7 +317,8 @@ if __name__ == '__main__':
     configuration = Configuration()
     if configuration.is_development():
         logging.basicConfig(level=logging.DEBUG)
-        fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=allow_other)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=True, nothreads=True, allow_other=allow_other, **fuse_options)
     else:
         logging.basicConfig(level=logging.ERROR)
-        fuse = FUSE(MongoFS(), mounting_point, foreground=False, nothreads=False, allow_other=allow_other)
+        fuse = FUSE(MongoFS(), mounting_point, foreground=False,
+                    nothreads=False, allow_other=allow_other, **fuse_options)
