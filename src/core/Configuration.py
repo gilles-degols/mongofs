@@ -44,7 +44,7 @@ class Configuration:
     def mongo_access_attempt(self):
         if self.conf['mongo']['access_attempt_s'] <= 0:
             # Kinda infinite
-            return 3600*24*365*100
+            return 3600 * 24 * 365 * 100
         return self.conf['mongo']['access_attempt_s']
 
     """
@@ -69,7 +69,7 @@ class Configuration:
     def lock_timeout(self):
         if self.conf['lock']['timeout_s'] <= 0:
             # Kinda infinite
-            return 3600*24*365*100
+            return 3600 * 24 * 365 * 100
         return self.conf['lock']['timeout_s']
 
     """ 
@@ -79,7 +79,7 @@ class Configuration:
     def lock_access_attempt(self):
         if self.conf['lock']['access_attempt_s'] <= 0:
             # Kinda infinite
-            return 3600*24*365*100
+            return 3600 * 24 * 365 * 100
         return self.conf['lock']['access_attempt_s']
 
     """ 
@@ -129,13 +129,25 @@ class Configuration:
         Indicates if we are in a development mode (= clean database before mount for example) or not.
     """
     def is_development(self):
-        return self.conf['development']
+        return self.conf.get('development', False)
 
     """
         The chunk size in gridfs. Value must be between 1 and 15MB maximum (to allow overhead of other fields)
     """
     def chunk_size(self):
         chunk_size = self.conf['mongo']['chunk_size']
-        if chunk_size < 1 or chunk_size > 15*1024*1024:
-            raise ValueError('Invalid chunk size, must be between 1 and '+str(15*1024*1024)+' bytes.')
+        if chunk_size < 1 or chunk_size > 15 * 1024 * 1024:
+            raise ValueError('Invalid chunk size, must be between 1 and ' + str(15 * 1024 * 1024) + ' bytes.')
         return chunk_size
+
+    """
+        Sets the default mode of the root node in mongofs
+    """
+    def default_root_mode(self):
+        return int(self.conf.get('default_root_mode', '0755'), 8)
+
+    """
+        Sets always mode of the root node in mongofs
+    """
+    def force_root_mode(self):
+        return self.conf.get('force_root_mode', False)
