@@ -1,6 +1,7 @@
 import unittest
 import subprocess
 import time
+import sys
 from collections import namedtuple
 
 """
@@ -10,7 +11,7 @@ from collections import namedtuple
 """
 class TestIntegration(unittest.TestCase):
     TEST_DIRECTORY = 'mnt/mongofs-integration-test'
-    START_COMMAND = 'nohup python3 -m src.main '+TEST_DIRECTORY+' test/resources/conf/mongofs.json >/dev/null 2>&1 &'
+    START_COMMAND = 'nohup ' + sys.executable + ' -m src.main test/resources/conf/mongofs.json ' + TEST_DIRECTORY + ' >/tmp/coucou 2>&1 &'
 
     def setUp(self):
         commands = [
@@ -46,7 +47,7 @@ class TestIntegration(unittest.TestCase):
                 time.sleep(0.05*(i+1))
             else:
                 return True
-        print('Impossible to mount the file system in the given time. Abort.')
+        print('Impossible to mount the file system ' + TestIntegration.TEST_DIRECTORY + ' in the given time. Abort.')
         exit(1)
 
     def kill_background_command(self, command):

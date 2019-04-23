@@ -1,6 +1,5 @@
 import unittest
 import json
-from bson import json_util
 from fuse import FuseOSError
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 

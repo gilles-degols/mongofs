@@ -70,23 +70,23 @@ We assume that you already have a MongoDB installation, otherwise, follow the pr
 ```
 git clone git@github.com:gilles-degols/mongofs.git
 yum -y install python36 fuse fuse-libs
-python3 -m ensurepip --default-pip
-python3 -m pip install --upgrade pip
-python3 -m pip uninstall fuse # Otherwise conflicts can happen with fusepy
-python3 -m pip install  -r requirements.txt
+python3.4 -m ensurepip --default-pip
+python3.4 -m pip install --upgrade pip
+python3.4 -m pip uninstall fuse # Otherwise conflicts can happen with fusepy
+python3.4 -m pip install  -r requirements.txt
 ```
 
 2. Run the tests
 
 ```
 # Run all tests
-python3 -m unittest discover -v
+python3.4 -m unittest discover -v
 
 # Run all tests of a class:
-python3 -m unittest -v test.core.test_GenericFile
+python3.4 -m unittest -v test.core.test_GenericFile
 
 # Run one specific test
-python3 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_save
+python3.4 -m unittest -v test.core.test_GenericFile.TestGenericFile.test_basic_save
 ```
 
 3. Mount the file system in a temporary directory
@@ -96,10 +96,10 @@ directly, as second argument.
 
 ```
 mkdir -p /mnt/data
-python3 -m src.main /mnt/data
+python3.4 -m src.main /mnt/data
 
 # With a specific configuration filepath (absolute or relative)
-python3 -m src.main conf/mongofs.json /mnt/data
+python3.4 -m src.main conf/mongofs.json /mnt/data
 ```
 
 4. Troubleshooting
@@ -170,7 +170,7 @@ Benchmarking is a difficult subject, so be careful when you compare numbers.
 Be aware that FUSE + fusepy (library used in mongofs) is in fact the slowest part of writing, and unfortunately we cannot improve the performance a lot more until it is improved on their side.
 
 ```
-python3 -m src.main conf/mongofs.json /mnt/data
+python3.4 -m src.main conf/mongofs.json /mnt/data
 
 # Test local file system
 yes "a" | dd of=output.dat bs=4k count=2500000 iflag=fullblock && time cat output.dat > /dev/null
