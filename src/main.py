@@ -191,6 +191,9 @@ class MongoFS(LoggingMixIn, Operations):
         Set permissions to a given path
     """
     def chmod(self, path, mode):
+        if path == '/' and configuration.force_root_mode():
+            raise FuseOSError(errno.EACCESS)
+
         gf = self.mongo.get_generic_file(filepath=path)
         gf.metadata['st_mode'] &= 0o770000
         gf.metadata['st_mode'] |= mode

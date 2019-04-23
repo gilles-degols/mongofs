@@ -53,8 +53,14 @@ class Mongo:
 
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
-        if GenericFile.is_generic_filepath_available(filepath='/'):
-            GenericFile.new_generic_file(filepath='/', mode=0o755, file_type=GenericFile.DIRECTORY_TYPE)
+        root = self.get_generic_file(filepath='/')
+        default_root_mode = self.configuration.default_root_mode()
+        if root is None:
+            GenericFile.new_generic_file(filepath='/', mode=default_root_mode, file_type=GenericFile.DIRECTORY_TYPE)
+        elif self.configuration.force_root_mode() and root.metadata['st_mode'] != default_root_mode:
+            root.metadata['st_mode'] = default_root_mode
+            root.basic_save()
+        
 
     """
         Create various indexes if they do not exist. Only called at startup
