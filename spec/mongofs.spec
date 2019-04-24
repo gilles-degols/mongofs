@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 %define __python /usr/bin/python3.6
 
-%{!?_release: %define _version 1.3.0 }
+%{!?_release: %define _version 1.4.0 }
 %{!?_release: %define _release 0 }
 
 # Following line is needed if you compile
@@ -90,6 +90,10 @@ rm -rf ${RPM_BUILD_ROOT}
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Wed Apr 24 2019 Gilles Degols - 1.4.0-0
+- Add default root mode option
+- Fix python dependencies
+
 * Tue Apr 09 2019 Gilles Degols - 1.3.0-0
 - Fix working directory of run script
 - Allow mongofs to be mounted as any other file system
