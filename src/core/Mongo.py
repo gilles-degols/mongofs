@@ -9,6 +9,7 @@ import pymongo
 import logging
 from expiringdict import ExpiringDict
 from fuse import FuseOSError, fuse_get_context
+from stat import S_IFDIR
 
 from src.core.Configuration import Configuration
 from src.core.MongoCache import MongoCache
@@ -54,7 +55,7 @@ class Mongo:
         # We need to be sure to have the top folder created in MongoDB
         GenericFile.mongo = self
         root = self.get_generic_file(filepath='/')
-        default_root_mode = self.configuration.default_root_mode()
+        default_root_mode = S_IFDIR | self.configuration.default_root_mode()
         if root is None:
             GenericFile.new_generic_file(filepath='/', mode=default_root_mode, file_type=GenericFile.DIRECTORY_TYPE)
         elif self.configuration.force_root_mode() and root.metadata['st_mode'] != default_root_mode:
