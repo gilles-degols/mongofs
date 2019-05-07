@@ -499,8 +499,18 @@ class Mongo:
                 total_chunks += 1
             Mongo.cache.insert_many(self.chunks_coll, chunks)
 
-        # We update the total length and that's it
-        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':total_size,'metadata.st_size':total_size,'metadata.st_blocks':GenericFile.size_to_blocks(total_size)}})
+        # We update the total length and its date and that's it
+        dt = time.time()
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{
+            '$set':{
+                'length':total_size,
+                'metadata.st_size':total_size,
+                'metadata.st_blocks':GenericFile.size_to_blocks(total_size),
+                'metadata.st_mtime': dt,
+                'metadata.st_atime': dt,
+                'metadata.st_ctime': dt
+            }
+        })
 
         return True
 
@@ -556,7 +566,17 @@ class Mongo:
             Mongo.cache.find_one_and_update(self.chunks_coll, {'_id':last_chunk['_id']},{'$set':{'data':last_chunk['data']}})
 
         # We update the total length and that's it
-        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{'$set':{'length':length,'metadata.st_size':length,'metadata.st_blocks':GenericFile.size_to_blocks(length)}})
+        dt = time.time()
+        Mongo.cache.find_one_and_update(self.files_coll, {'_id':file._id},{
+            '$set': {
+                'length': length,
+                'metadata.st_size': length,
+                'metadata.st_blocks': GenericFile.size_to_blocks(length),
+                'metadata.st_mtime': dt,
+                'metadata.st_atime': dt,
+                'metadata.st_ctime': dt
+            }
+        })
         return True
 
     """
