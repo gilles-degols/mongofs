@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 %define __python /usr/bin/python3.6
 
-%{!?_release: %define _version 1.4.1 }
+%{!?_release: %define _version 1.4.2 }
 %{!?_release: %define _release 0 }
 
 # Following line is needed if you compile
@@ -90,6 +90,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %config /etc/mongofs/mongofs.json
 
 %changelog
+* Thu May 07 2019 Gilles Degols - 1.4.2-0
+- Fix handling of time change on files
+
 * Fri Apr 26 2019 Gilles Degols - 1.4.1-0
 - Don't forget to force S_IFDIR on root
 
