@@ -611,7 +611,8 @@ class Mongo:
     """
     def release_generic_file(self, filepath, generic_file):
         lock_id = self.lock_id(filepath)
-        Mongo.cache.find_one_and_update(self.files_coll,{'_id': generic_file._id}, {'$pull': {'lock': {'id': lock_id}}})
+        if len(generic_file.lock) > 0: # We can receive an unlock by default (even if there is no lock previously taken). As we are the only owner of that lock, we do not need to do the query if we do not find it locally.
+            Mongo.cache.find_one_and_update(self.files_coll,{'_id': generic_file._id}, {'$pull': {'lock': {'id': lock_id}}})
         return True
 
     """

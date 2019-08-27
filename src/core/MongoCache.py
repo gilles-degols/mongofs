@@ -190,11 +190,9 @@ class MongoCache:
     @retry_connection
     def find_one_and_update(self, coll, query, update):
         result = self.database[coll].find_one_and_update(query, update, return_document=ReturnDocument.AFTER)
-
         if coll.endswith('.files') and result is not None:
             # We directly update the document in the cache.
             key = str(result['directory_id']) + '/' + str(result['filename'])
-            self.reset_cache()
             MongoCache.cache[key] = result
         elif coll.endswith('.chunks') and result is not None:
             # We simply reset the data cache to avoid complicating things if we update a document.
