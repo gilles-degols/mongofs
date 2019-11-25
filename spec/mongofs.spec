@@ -2,7 +2,7 @@
 %global _python_bytecompile_errors_terminate_build 0
 %define __python /usr/bin/python3.6
 
-%{!?_release: %define _version 1.4.3 }
+%{!?_version: %define _version 1.4.3 }
 %{!?_release: %define _release 0 }
 
 # Following line is needed if you compile
